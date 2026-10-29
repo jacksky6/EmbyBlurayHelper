@@ -38,6 +38,8 @@ jobs:
           --output artifacts/${{ matrix.rid }}
       - name: Add example configuration
         run: cp emby-bluray-helper.example.json artifacts/${{ matrix.rid }}/emby-bluray-helper.example.json
+      - name: Add third-party licenses
+        run: mkdir -p artifacts/${{ matrix.rid }}/licenses && cp THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt artifacts/${{ matrix.rid }}/licenses/BDInfo-LGPL-2.1.txt
       - uses: actions/upload-artifact@v4
         with:
           name: EmbyBlurayHelper-${{ matrix.rid }}

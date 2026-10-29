@@ -8,4 +8,7 @@
     <RootNamespace>EmbyBlurayHelper.ProbeWrapper</RootNamespace>
     <Version>0.1.0</Version>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BDInfo" Version="0.8.0" />
+  </ItemGroup>
 </Project>

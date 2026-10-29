@@ -2,13 +2,16 @@
 
 Emby 4.10.x Blu-ray / UHD Blu-ray media-probing helper.
 
-The first milestone is a conservative `ffprobe` wrapper. Emby starts it as a
-child process, and it forwards the original Emby `ffprobe` output and exit code
-without replacing or modifying Emby's `ffmpeg`.
+The wrapper starts Emby's original `ffprobe` as a child process. For JSON probes
+of Blu-ray streams it reads matching MPLS/CLPI metadata and adds missing
+`tags.language` values by PID, then forwards the rest of the original output.
+It never replaces or modifies Emby's `ffmpeg`.
 
-> Current status: pass-through only. BDMV/MPLS/CLPI language extraction and the
-> persistent probe cache are not implemented yet. This version does not fix
-> missing Blu-ray stream languages.
+For Emby's Blu-ray `concat:` input, the wrapper matches the exact ordered clip
+list to an MPLS playlist and uses that playlist's PID/language table. For a
+direct `.m2ts` probe it reads the corresponding CLPI file instead. It reads
+metadata files only, not movie payloads. If a directory is probed, only
+unambiguous PID/language pairs across its CLPI files are used.
 
 ## Build
 
@@ -63,7 +66,12 @@ installations.
 
 When Emby invokes the wrapper, arguments are forwarded unchanged to the
 configured upstream `ffprobe`. Stdout, stderr, and the upstream exit code are
-preserved. Wrapper diagnostics are written to stderr.
+preserved. For a Blu-ray JSON probe, only missing stream language tags are
+added. Wrapper diagnostics are written to stderr.
+
+The wrapper uses the Jellyfin `BDInfo` 0.8.0 package (LGPL-2.1-only) for MPLS
+and CLPI parsing. The license text is included in
+`THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt` and in each published artifact.
 
 ## Emby setup
 
