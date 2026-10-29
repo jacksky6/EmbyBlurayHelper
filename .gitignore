@@ -1,0 +1,6 @@
+bin/
+obj/
+artifacts/
+emby-bluray-helper.json
+*.user
+*.suo

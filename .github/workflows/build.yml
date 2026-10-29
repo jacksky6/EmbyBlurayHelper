@@ -1,0 +1,44 @@
+name: Build Probe Wrapper
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+          - rid: linux-x64
+          - rid: linux-arm64
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Publish self-contained single-file wrapper
+        run: >-
+          dotnet publish
+          src/EmbyBlurayHelper.ProbeWrapper/EmbyBlurayHelper.ProbeWrapper.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --output artifacts/${{ matrix.rid }}
+      - name: Add example configuration
+        run: cp emby-bluray-helper.example.json artifacts/${{ matrix.rid }}/emby-bluray-helper.example.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EmbyBlurayHelper-${{ matrix.rid }}
+          path: artifacts/${{ matrix.rid }}
