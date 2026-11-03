@@ -9,6 +9,12 @@ using EmbyBlurayHelper.Proxy;
 using EmbyBlurayHelper.Proxy.Chapters;
 using Microsoft.Extensions.Caching.Memory;
 
+if (args.Length == 2 && args[0] == "--compare-metadata")
+{
+    await MetadataParityCheck.Run(args[1]);
+    return;
+}
+
 // Local diagnostic executable only; never included in portable/SPK packages.
 // It exercises either byte substitution for item 12, or only the production
 // transport for real ISO 1886 with unchanged metadata. No persistent writes.
