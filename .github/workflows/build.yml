@@ -1,4 +1,4 @@
-name: Build Probe Wrapper
+name: Build Helpers
 
 on:
   push:
@@ -26,6 +26,57 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Verify transport language patching
+        run: dotnet run --project tests/EmbyBlurayHelper.Proxy.Tests -c Release
+      - name: Verify library language tasks
+        run: dotnet run --project tests/EmbyBlurayHelper.Library.Tests -c Release
+      - name: Verify Emby plugin stream preservation
+        run: dotnet run --project tests/EmbyBlurayHelper.EmbyPlugin.Tests -c Release
+      - name: Verify native chapter tasks
+        run: dotnet run --project tests/EmbyBlurayHelper.Chapters.Tests -c Release
+      - name: Verify native thumbnail scheduling
+        run: dotnet run --project tests/EmbyBlurayHelper.Thumbnails.Tests -c Release
+      - name: Build optional Emby ISO plugin
+        run: dotnet build src/EmbyBlurayHelper.EmbyPlugin -c Release -o artifacts/plugin
+      - uses: actions/setup-node@v4
+        if: matrix.rid == 'linux-x64'
+        with:
+          node-version: 22
+      - name: Verify library selection in Web console
+        if: matrix.rid == 'linux-x64'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/helper-ui" jsdom@26.1.0 --no-save --package-lock=false --ignore-scripts
+          node tests/web/library-language.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
+          node tests/web/native-chapters.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
+      - name: Publish unified Web console
+        run: >-
+          dotnet publish src/EmbyBlurayHelper.App -c Release
+          -r ${{ matrix.rid }} --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o artifacts/app/${{ matrix.rid }}
+      - name: Verify management and forwarding
+        if: matrix.rid == 'linux-x64'
+        run: |
+          chmod +x artifacts/app/linux-x64/EmbyBlurayHelper
+          dotnet run --project tests/EmbyBlurayHelper.App.Tests -c Release -- artifacts/app/linux-x64/EmbyBlurayHelper
+      - name: Package unified Web console
+        run: sh scripts/package-portable.sh ${{ matrix.rid }}
+      - name: Package DSM 7.2 x86_64
+        if: matrix.rid == 'linux-x64'
+        run: |
+          python3 scripts/package-synology.py
+          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-19-dsm7.2-x86_64.spk --lifecycle
+      - uses: actions/upload-artifact@v4
+        if: matrix.rid == 'linux-x64'
+        with:
+          name: EmbyBlurayHelper-DSM7.2-x86_64
+          path: |
+            artifacts/downloads/*-dsm7.2-x86_64.spk
+            artifacts/downloads/*-dsm7.2-x86_64.spk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EmbyBlurayHelper-Web-${{ matrix.rid }}
+          path: artifacts/downloads/*-${{ matrix.rid }}.tar.gz
       - name: Publish self-contained single-file wrapper
         run: >-
           dotnet publish
@@ -39,8 +90,26 @@ jobs:
       - name: Add example configuration
         run: cp emby-bluray-helper.example.json artifacts/${{ matrix.rid }}/emby-bluray-helper.example.json
       - name: Add third-party licenses
-        run: mkdir -p artifacts/${{ matrix.rid }}/licenses && cp THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt artifacts/${{ matrix.rid }}/licenses/BDInfo-LGPL-2.1.txt
+        run: mkdir -p artifacts/${{ matrix.rid }}/licenses && cp THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt THIRD-PARTY-LICENSES/DiscUtils-MIT.txt artifacts/${{ matrix.rid }}/licenses/
       - uses: actions/upload-artifact@v4
         with:
           name: EmbyBlurayHelper-${{ matrix.rid }}
           path: artifacts/${{ matrix.rid }}
+      - name: Publish on-demand language proxy
+        run: >-
+          dotnet publish
+          src/EmbyBlurayHelper.Proxy/EmbyBlurayHelper.Proxy.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --output artifacts/proxy/${{ matrix.rid }}
+      - name: Add proxy example configuration
+        run: cp emby-bluray-helper-proxy.example.json artifacts/proxy/${{ matrix.rid }}/emby-bluray-helper-proxy.example.json
+      - name: Add proxy third-party license
+        run: mkdir -p artifacts/proxy/${{ matrix.rid }}/licenses && cp THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt THIRD-PARTY-LICENSES/DiscUtils-MIT.txt artifacts/proxy/${{ matrix.rid }}/licenses/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EmbyBlurayHelper-Proxy-${{ matrix.rid }}
+          path: artifacts/proxy/${{ matrix.rid }}

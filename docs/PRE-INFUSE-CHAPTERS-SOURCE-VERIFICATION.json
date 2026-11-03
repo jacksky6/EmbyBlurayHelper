@@ -1,0 +1,1181 @@
+{
+  "status": "reconstructed-from-recorded-source-patches-not-an-original-historical-commit",
+  "recoveredAt": "2026-11-03T16:06:53.794Z",
+  "sourceSnapshot": "2026-11-01T21:06:00+08:00",
+  "originalHistoricalCommit": null,
+  "historicalBaseCommit": "c472169910fd3cdff94436ca147f80b218ad5cca",
+  "recoveryBranch": "recovery/pre-infuse-chapters-20261101",
+  "sourceFileCount": 139,
+  "sourceFileHashes": [
+    {
+      "name": ".github/workflows/build.yml",
+      "bytes": 5093,
+      "sha256": "7CC462487199C288FCABC0836D9CF5ED46AEFD288068DDD280F9E713F5EB7D4B"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/ProbeProcess.cs",
+      "bytes": 6198,
+      "sha256": "8EE56D50067A2A22715BFDC090A275121891611F4A49B19F0F2B52268D544657"
+    },
+    {
+      "name": "README.md",
+      "bytes": 11477,
+      "sha256": "E2117B38B1FD298CEE75E2D1033CE8F9806D29245D7ED12927C7EAA486B9870A"
+    },
+    {
+      "name": "emby-bluray-helper.example.json",
+      "bytes": 30,
+      "sha256": "6877EAD0D4C4E0224719174EA90C46609FCA78A749D515B4909800FBD9DEB0E6"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/Program.cs",
+      "bytes": 1337,
+      "sha256": "DBFB72F024DB643334B3A69BF3518B3F303B2E78E2C1410E07C9A47770310AF2"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/EmbyBlurayHelper.ProbeWrapper.csproj",
+      "bytes": 645,
+      "sha256": "E0700EF2F4FD45B8D3F462CE32506603A9FD407BEC6B67C6A95328FFF42ED1C1"
+    },
+    {
+      "name": ".gitignore",
+      "bytes": 94,
+      "sha256": "5BADB654D5109D7DCA1921F4FA93E79099C3808A0EF1588259EB77FF9488F0D8"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/ProbeConfiguration.cs",
+      "bytes": 3074,
+      "sha256": "3769F2005EFA0002AB1C62CCE83ECF793E8C0A151201BC69DBF7C48A7F87D4AD"
+    },
+    {
+      "name": "THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt",
+      "bytes": 26413,
+      "sha256": "99E1F86E669895F98F0A9C7A26640DB88714C575D027E5DE7AA67489B14653C0"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs",
+      "bytes": 30525,
+      "sha256": "DF7C0AB7B3E423769DF172F370CF1513321086D7F398B346D3A49BE69D65061C"
+    },
+    {
+      "name": "emby-bluray-helper-proxy.example.json",
+      "bytes": 166,
+      "sha256": "9AF1A2A5A04A8AA91D8165ABE5D0C3F454B6CDCA6A4B7251FEAE949951409D40"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/EmbyBlurayHelper.Proxy.csproj",
+      "bytes": 438,
+      "sha256": "FA06B16AA7BEF4C8FCFF4300C233DA79684912FD41698C3E9BFB3A28B31276E6"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/Program.cs",
+      "bytes": 887,
+      "sha256": "34E208C2C23E90CA7963E74D5E9C3DE1B1E9BF18CD71D6400B9BFC17CFF63F11"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/BlurayLanguageMap.cs",
+      "bytes": 7104,
+      "sha256": "9C24421D42CDBD841E775D962A612944344E938ED0DFF25F3BCE4D7D1F75209D"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/ProxyConfiguration.cs",
+      "bytes": 1098,
+      "sha256": "4D7D51B7B9226AA821264F40888202D028A6470740DDE0C26EACE438BDB2D200"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/TransportLanguagePatcher.cs",
+      "bytes": 11039,
+      "sha256": "67DB077DD8F79C64721E0BEFE6BC037548E5BDB97885CEBF1D72B2F7F6ED17D9"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/EmbyProxy.cs",
+      "bytes": 19157,
+      "sha256": "607CFC4A630DE78916BBB29DBE7754754A7A8A9B4BFFB07598045962EE096B12"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Proxy.Tests/EmbyBlurayHelper.Proxy.Tests.csproj",
+      "bytes": 496,
+      "sha256": "01832F22C4A31C4D4CFEA9EA525A995C976128F620C9632464338B9C749ED0BB"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Proxy.Tests/Program.cs",
+      "bytes": 10120,
+      "sha256": "F59C1CEBDD19130D1ED55B22EB51CBD8DD0E0C06C6F21AB91E2C278EE3B51BDA"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/SettingsStore.cs",
+      "bytes": 4893,
+      "sha256": "6CADAB33F8DE22C6F748BC1645CDF65A9A8AF1765B2F307E2DB39ADA5CE9CDAD"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/HelperLog.cs",
+      "bytes": 5383,
+      "sha256": "7704E54CF52AC7703D6CDF26D62EB8D58B2261C0F26B8B67512597A94619116B"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/EmbyBlurayHelper.App.csproj",
+      "bytes": 2459,
+      "sha256": "692525234488C475F55BEB059FAB004D8A7D8267BB720AB729C70E21AC65860A"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/EmbyIntegration.cs",
+      "bytes": 20838,
+      "sha256": "CDF2E53552C3C10B04F5369464CA681E17D7C2FA15064DE5A425D4791CDE559F"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Program.cs",
+      "bytes": 18020,
+      "sha256": "759E7DAE9D2962204763FBAB0AF6722F8BE865CC4A687B4889ECFEEA2B0FB7DF"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Web/app.css",
+      "bytes": 37211,
+      "sha256": "C48BA43C445258455CDF000E5DB11DCD296E228FEA66C12C6DB346DB201B5544"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Web/app.js",
+      "bytes": 43588,
+      "sha256": "D4CB8B10F557E781D1EAD5CB7CF2ABB4A05B01A4C6EDDDB3E917170553768058"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Web/index.html",
+      "bytes": 46400,
+      "sha256": "1106EC60CA23D36FA2485991721E0C60D58A5E73383789FBECA85C72A6740A4F"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.App.Tests/EmbyBlurayHelper.App.Tests.csproj",
+      "bytes": 214,
+      "sha256": "88DD96E87E72037AF88CD8D96F471678F70B508B9234C8E81AC8C623D1C06968"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.App.Tests/Program.cs",
+      "bytes": 37394,
+      "sha256": "9D72D58F43F593FE4B35F7087ACD5926836934467A2865FB1996BF29994576AC"
+    },
+    {
+      "name": "scripts/package-portable.sh",
+      "bytes": 1428,
+      "sha256": "BCE1A2B8589EB5789CA91542469ABB6AB92FE501A0784C87328732E4CAAC269E"
+    },
+    {
+      "name": "scripts/start-linux.sh",
+      "bytes": 205,
+      "sha256": "D79C27EB81BCBD3796052B1683C16DE570EFC475C1B9AD3AC2685BC19C7254E2"
+    },
+    {
+      "name": "docs/WEB-CONSOLE.md",
+      "bytes": 11840,
+      "sha256": "E47D6D68CA062E44F88CC567618540C1C75462EC4C79F00F35E1366ABCDB2D6D"
+    },
+    {
+      "name": "scripts/verify-ui.cjs",
+      "bytes": 6228,
+      "sha256": "C3C50630EC321AEC9388B3248BC3BE491F8C8328582AB721BF5131AEC783DF33"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/AccountStore.cs",
+      "bytes": 2669,
+      "sha256": "958BB263AA27B91966D331EDE068E70A53EB766732CD1E8D0A8BD16E25909532"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/ProbeSettings.cs",
+      "bytes": 2806,
+      "sha256": "2023EFF9A1B7DF7EA85A5C2DC7B2446A2F42EAE59FB591F87C172AC3043FC441"
+    },
+    {
+      "name": "packaging/synology/scripts/preupgrade",
+      "bytes": 99,
+      "sha256": "0FB01B92D0C10ADDAE601B7AD161D9C096645E4503164716FB9E222305BE074A"
+    },
+    {
+      "name": "packaging/synology/scripts/preuninst",
+      "bytes": 459,
+      "sha256": "6726F74BE0298878B2E21C57AAC3A219BAEEFC819DEB99BBA95B2EEEBB423527"
+    },
+    {
+      "name": "packaging/synology/scripts/postuninst",
+      "bytes": 93,
+      "sha256": "D42F614742E1FC57E5F2BE06133D773856A93B16DEAD7A159551AF35D6D61A8D"
+    },
+    {
+      "name": "packaging/synology/scripts/preinst",
+      "bytes": 359,
+      "sha256": "6C9A0632E159943D0AFF205894135E23BD1C93B02B62DA06B97BE115234868E0"
+    },
+    {
+      "name": "packaging/synology/scripts/common.sh",
+      "bytes": 1571,
+      "sha256": "DD061E35F99706D2FA10B5E5D9D40556B83653F983F71FC9C644635C4B5FD67C"
+    },
+    {
+      "name": "packaging/synology/scripts/postinst",
+      "bytes": 401,
+      "sha256": "9AAE7CEE0747A70B10A13C85EE4B06FBC36E44DFD821723F7CBACBBDE25F463A"
+    },
+    {
+      "name": "packaging/synology/scripts/postupgrade",
+      "bytes": 55,
+      "sha256": "BB025D200CEAC0E7CA96397ED8754D47198D79B3A7C0571E3F89DC60661BA991"
+    },
+    {
+      "name": "packaging/synology/scripts/start-stop-status",
+      "bytes": 1459,
+      "sha256": "75E8398C221F563F6D4F8282D5F7CBC81DC782D894DE33B68C7056571BFBF343"
+    },
+    {
+      "name": "packaging/synology/probe.sh",
+      "bytes": 356,
+      "sha256": "C78A9F3C02E88C489BBCAB9FB3BEF0E613C6D7BE4BA95DB3B79CDD73541A844B"
+    },
+    {
+      "name": "packaging/synology/INFO",
+      "bytes": 804,
+      "sha256": "5AA53AEBEA4EE1BA6A9B20ECBFB7E28EBCEC67E566F746F178F04C22BDB9A66B"
+    },
+    {
+      "name": "packaging/synology/conf/resource",
+      "bytes": 67,
+      "sha256": "AECA31694431EAC58B40E8CCDADABAC1B3283D59776FD6094AEDB0DFDA89EE7D"
+    },
+    {
+      "name": "packaging/synology/conf/privilege",
+      "bytes": 111,
+      "sha256": "2D1DD6FAD529F45C02F527961C4176C7DD018A365887B1A8BC83BB38AC18B61B"
+    },
+    {
+      "name": "packaging/synology/ui/config",
+      "bytes": 314,
+      "sha256": "68F504BBEEE96D302FE66138405E292CAA366086FCEF4FF93E4F77DF472A7A55"
+    },
+    {
+      "name": "packaging/synology/ui/EmbyBlurayHelper.sc",
+      "bytes": 286,
+      "sha256": "CFE1787769835DEF5B4EBAEBE74B7ED0287BC7FD823352E5678BEC8AC79A28D1"
+    },
+    {
+      "name": "scripts/package-synology.py",
+      "bytes": 5761,
+      "sha256": "5589D4B4BAA60AE9176536C01CB6EF9D13823CE7D51E3472744FA0031543CA4D"
+    },
+    {
+      "name": "scripts/build-synology.ps1",
+      "bytes": 1287,
+      "sha256": "1A8F9BDB319080D52B231C0B35CD97A73F76C477ECB811C09FFA988E49E3559B"
+    },
+    {
+      "name": "docs/SYNOLOGY.md",
+      "bytes": 15195,
+      "sha256": "52A406D61D318BF4F6F6384B52EC399760A64829046C9872E3671C0DEB463743"
+    },
+    {
+      "name": "tests/synology/check-spk.py",
+      "bytes": 21550,
+      "sha256": "359AE392C366C3795987175745144D363F17F548C6077D5162E8D770EA4AEA1D"
+    },
+    {
+      "name": "scripts/verify-probe-status-ui.cjs",
+      "bytes": 20022,
+      "sha256": "93219E6AE66E1C8D079F2584D7ED3FA77F008D525027DD19969E1D38785BD70F"
+    },
+    {
+      "name": "scripts/check-bluray-reader.cjs",
+      "bytes": 2642,
+      "sha256": "4EA47E92E0BCA8315E26C218E9693DFE6785DF6D8FCC12DE99D5B699231B98E3"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/EmbyToolProcess.cs",
+      "bytes": 948,
+      "sha256": "4535113803465B21D84E251EC6907684FBF76C792CFC0675C024FD177133C4CB"
+    },
+    {
+      "name": "scripts/verify-multiclip-live.cjs",
+      "bytes": 12682,
+      "sha256": "C020791D2D9C571585FABAABF51962D43A83378069400EC2422CC320B5833358"
+    },
+    {
+      "name": "scripts/start-multiclip-test.ps1",
+      "bytes": 3393,
+      "sha256": "651B8049DE4BC128F67B7D4ED8180DFC1B7F3C83C04B5F356C69BA4D32A352CA"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.Proxy/WholeClipPlaylist.cs",
+      "bytes": 9218,
+      "sha256": "BBCB3E0257BC808D0A8C1A43CBAAE2AEA862D0B69D8B47816F97C0DDDCD25A8C"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Proxy.Tests/WholeClipChecks.cs",
+      "bytes": 5954,
+      "sha256": "2D20D03C1CCCCBFC50FA8C57B2B1DEEEB4FA5F4622239879360A2A929D2FB3DB"
+    },
+    {
+      "name": "docs/RESEARCH-BLURAY-SUBTITLE-LABELS.md",
+      "bytes": 21123,
+      "sha256": "EBBE0CDFEDCD5FB6F6017549CC5D2509CDBBE47AEDEDE37C20AD12B780102698"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/LibraryLanguageTask.cs",
+      "bytes": 40986,
+      "sha256": "60E0F0DB71FC36C17F2FA6811E9BC67BC8E9CCECA661ECD63A4F40AB29CCD160"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Library.Tests/Program.cs",
+      "bytes": 30534,
+      "sha256": "747F4FC6A990647759D068055343E123D0D561927CA6BA3491CC0A574DF1DE92"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Library.Tests/EmbyBlurayHelper.Library.Tests.csproj",
+      "bytes": 1502,
+      "sha256": "129598B07B5795E654624AF1878355504E09EFB74883DAF65EFAE56140C27E8D"
+    },
+    {
+      "name": "docs/LIBRARY-LANGUAGE.md",
+      "bytes": 11568,
+      "sha256": "97AF970B36C21EEB452BC43C6F1BAC7746BB86FE27DAB9AF22B3D9F072FEEED7"
+    },
+    {
+      "name": "tests/web/library-language.test.cjs",
+      "bytes": 11023,
+      "sha256": "C5EAB30667F99919C228F941645C665F1B14B261B04D49DB0B4C99706ACC3D3F"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Probe.Tests/EmbyBlurayHelper.Probe.Tests.csproj",
+      "bytes": 1235,
+      "sha256": "28084111D48638DDFB8A31FA210E2E74019B0EDCF60FC6A4460B3FD35C39F164"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Probe.Tests/Program.cs",
+      "bytes": 11134,
+      "sha256": "9B202C7718FDF18CB26DBA8AE43D025C1414DD6507C361B3D2608CD9EE2504FB"
+    },
+    {
+      "name": "THIRD-PARTY-LICENSES/DiscUtils-MIT.txt",
+      "bytes": 1205,
+      "sha256": "56D72E40882D0D2B0303E6783E3CC9175EC65C2A8DD44462EE1DC8BC0728E943"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Plugin.cs",
+      "bytes": 1473,
+      "sha256": "E14DB104F470D912B0B0A8C55501E7746C6D3ABF5076F55A3AAF3662F8DDC32A"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/EmbyBlurayHelper.EmbyPlugin.csproj",
+      "bytes": 1208,
+      "sha256": "E6218512402DF420EE1ED7D72395015B79FF334B66A5AB7687E77C27E8CD3CF0"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/StreamMerge.cs",
+      "bytes": 1957,
+      "sha256": "C9D34F1668BB69A78A6297304D94C0BFF80F780FDFA8A7D0BE0601753A88A8FC"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.EmbyPlugin.Tests/EmbyBlurayHelper.EmbyPlugin.Tests.csproj",
+      "bytes": 1345,
+      "sha256": "DF559E52D1D0ECFB36D2ED6FC80D4B9AFA851B51F3DD3F88CE5A5FE5CCC15DFA"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.EmbyPlugin.Tests/Program.cs",
+      "bytes": 13541,
+      "sha256": "0C7FABBCFBCEB05523AB8577C922E997B8065E92228D42078F04B6B9EFC23034"
+    },
+    {
+      "name": "docs/ISO-LANGUAGE-LOCAL-VALIDATION.md",
+      "bytes": 14689,
+      "sha256": "26363BA77751727270BFD223BE4CB79F7ADC927F8F5D6694B39FCBAEF8D6C342"
+    },
+    {
+      "name": "scripts/update-local-test.ps1",
+      "bytes": 6935,
+      "sha256": "EFBF12835D98ADF9F32B8251260E057E95820D7EFA1CC6696BB8AC13C3ACF23A"
+    },
+    {
+      "name": "docs/ISO-PLAYBACK-DIAGNOSIS.md",
+      "bytes": 8317,
+      "sha256": "5011569E6C35F4407128575E89F82984A96EB812E3061EE7AED2180EFE794AB2"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/ProbeBluRayMediaService.cs",
+      "bytes": 5612,
+      "sha256": "83FFB4E02DA6F6124716A80721B658045EA6DFB164E34BAFADC898C77816E104"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/ProbeRequests.cs",
+      "bytes": 1790,
+      "sha256": "A2F336CA75CAACEFA40AFC4C7E2EFC167CFF41F121C2F4D2C79577BAAA9A250A"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/BluRaySourceResolver.cs",
+      "bytes": 2971,
+      "sha256": "0C7BF99A2A24E820B95E4F49A7BD9ADFBDEFE6FDCB6A7189C211325A66988FD2"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Persistence/BluRayMediaWriter.cs",
+      "bytes": 3161,
+      "sha256": "96574574624C86C89F0AA34C7354529DBB2D3DA776B5D6799FDD9294B2C26A33"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/SavedBluRayMedia.cs",
+      "bytes": 1442,
+      "sha256": "41CC4E81217648B95A235F310B1AF60C33F8B97E0154343A7D8C0C76ABDE12AD"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/BluRayMediaProbe.cs",
+      "bytes": 1800,
+      "sha256": "93E07EFC581D2888731F4432F8A4334EB54F428CB08C2560933AA87EC75CF7D6"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/MediaFacts.cs",
+      "bytes": 392,
+      "sha256": "0DD2D4B490951CCC25DC9B4DE1FB50872D74CBB7FC0081D5FFC99C6A3D1EDEC6"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/LibraryMediaAnalyzer.cs",
+      "bytes": 4413,
+      "sha256": "F371C6CFB76CEB37FF596EB8F4C8F004A07EF679116204D9B2C0B48F678F3311"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/LibraryMediaModels.cs",
+      "bytes": 2866,
+      "sha256": "AC729E3FC87CA4A09B8AE2069AD8D1F50EB2D37D05E491085461F10DDE6BF845"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/EmbyJsonContent.cs",
+      "bytes": 495,
+      "sha256": "133B938372E91954BEEC2CE8094EECF9918DF971E0DF24930702098C0561A78D"
+    },
+    {
+      "name": "docs/ARCHITECTURE.md",
+      "bytes": 11507,
+      "sha256": "8FD462ECA79FF3BAC14DA3FDDC3EFB51E67555A5B32D8C84DEB5FFA0D03519AC"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/EmbyRequestFailure.cs",
+      "bytes": 2022,
+      "sha256": "68C334E15AFE4A4C633CC2FD2BD70875AD5A62A9CC1BC089C9C66FBE624650BD"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/IsoPrerequisites.cs",
+      "bytes": 8199,
+      "sha256": "447B4937A650F84B5DC82E64689190AB4593C4251E106B093FAC363071278BAC"
+    },
+    {
+      "name": "docs/DSM-ISO-DIAGNOSIS.md",
+      "bytes": 4185,
+      "sha256": "A05E7604ABD882C1563CA9463D5B948F862FA4BBDD09F05D9930B461D04CD842"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs",
+      "bytes": 9740,
+      "sha256": "69628C101E1C1177D4A9C7DCEE2C813BB12590099FB857CE0F77880A3212E0ED"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs",
+      "bytes": 6288,
+      "sha256": "AE5A54217D10A6057B4340A13336DF11F71BF73A6035CA8152258F7C4F93546A"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/IsoMediaProbe.cs",
+      "bytes": 13552,
+      "sha256": "1174608A219F0A527AA8CD7C82DAD340FB93857C7F4BB00CEFA77CC229EE324A"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Probe.Tests/DiscInspection.cs",
+      "bytes": 2335,
+      "sha256": "1DC5C54FEF625397F3D271100CCBDACF49A17FA0C2F662BC0D0955F4DD04F5EC"
+    },
+    {
+      "name": "docs/109-WARNING-VALIDATION.md",
+      "bytes": 3999,
+      "sha256": "E62A1E87E2B048321C369C51B7272AC92BC40A0A5AF6AB7E20BDE1756FF15B23"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureMerger.cs",
+      "bytes": 6496,
+      "sha256": "957A20EE06627923A7E0B82051ED9FD9B4087048B397B78EEA4BF7EF6CBE238F"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureEnricher.cs",
+      "bytes": 5322,
+      "sha256": "9E4FA7850DAE86EC41AC6FB000E7129A8F289EEA0C719FE8E81473824BBDC258"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureOptions.cs",
+      "bytes": 292,
+      "sha256": "B5AC29DE5D3B2DC504A378369AF8C70FAEA530EA040185294C3CB0FEA38FBB93"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/MediaFeatures/AutomaticMediaFeatureProvider.cs",
+      "bytes": 6486,
+      "sha256": "457D5DDB965C55730F6F136ABDF06DC35254203ED366C2518A8FDFEBADA82C6E"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/MediaFeatures/FeatureStreamMerge.cs",
+      "bytes": 1951,
+      "sha256": "B6343C022E46C73D5C69CB9E62E16FBB6457E270452DE7FC4F9CAD845FFFCA05"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/MediaFeatureService.cs",
+      "bytes": 7909,
+      "sha256": "9F5470804B183FCEE602BB1247381698758AC9BBF2D844C5E57C3C157F2A9F9A"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Probe.Tests/MediaFeatureChecks.cs",
+      "bytes": 9088,
+      "sha256": "CFF25FDE758C772EEA558FC6C4B31E2D9DDD4EAA99AAADDCD4EF394E3765F48F"
+    },
+    {
+      "name": "docs/MEDIA-FEATURES.md",
+      "bytes": 11859,
+      "sha256": "6F84031BB6B0FFD5F933D7C0D05043E0DD16101E24C7BF967D99E2D64A6244B6"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureAttempt.cs",
+      "bytes": 1149,
+      "sha256": "D6D59E61EB2F5764E19011C929D032D633519358B9D12DDF306606877C5931DA"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureReceipt.cs",
+      "bytes": 2670,
+      "sha256": "B9D62A28BA71E39FB791BD2A06EC75CA2E5D5A36E4675F7B7C489BCCF19EE868"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/MediaFeatureCatalog.cs",
+      "bytes": 12148,
+      "sha256": "BBA2748152AA640721FECCA72C2075D329DCA268C559BB1BE8FBA6DBA3E06B9E"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/MediaFeatureBatchModels.cs",
+      "bytes": 2439,
+      "sha256": "1DD74C22A2FBC173EFD01C837FA56023EF6C5783647E87CC40687355ADE03393"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/MediaFeatureBatch.cs",
+      "bytes": 19561,
+      "sha256": "64736B7CFD13E42C89DF7A0599AD559364E3267804F85B875E629656399AA14E"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Web/media-features.js",
+      "bytes": 10519,
+      "sha256": "403AD6E73FBBBF0D19AB296FBF69B6FEB68B3531A73E6EB33712645359AF89E6"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Features.Tests/Program.cs",
+      "bytes": 14047,
+      "sha256": "504F31B4266BDF6787A59C7B28B5DA61D1A3E09112D1F8FE1188B20D9F8E60D5"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Features.Tests/EmbyBlurayHelper.Features.Tests.csproj",
+      "bytes": 1196,
+      "sha256": "74B3496F791F9D24D50666967272E3BA056348DC676B8EC23A5BCB46428B1033"
+    },
+    {
+      "name": "tests/web/media-feature-batch.test.cjs",
+      "bytes": 6640,
+      "sha256": "6F61406ECEEE8AFFB158F0233AF21390896F4E80A70CB233444D2571ED416910"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/NativeChapterMerge.cs",
+      "bytes": 2769,
+      "sha256": "55477A2092B42AB33CD790AAC792BFD304819D09C0E29431B686104240BB4C21"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/DiscChapterReader.cs",
+      "bytes": 3022,
+      "sha256": "6102E989A7E0332FB782F6B1392FD1C7FE9121FF386DBF498B4F9600FB156D32"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/ChapterWriter.cs",
+      "bytes": 4943,
+      "sha256": "F8051067D25E269CB042C66916312795985366FDB72B0011D306D8CD273CB358"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/AutomaticChapterProvider.cs",
+      "bytes": 4025,
+      "sha256": "06C2B6FCBA7CFCFC6EAA76E824BD0320147E8AFF8A3A0C087360E5C1136FBE2F"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/ChapterService.cs",
+      "bytes": 2921,
+      "sha256": "8CED29264A60CCC2AA6C4CE7CDC6455C7CEE530CD9DC5D0569298A48F71242C4"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/ChapterProcess.cs",
+      "bytes": 3372,
+      "sha256": "B986265B60A7E8CB1AAD18B45A6E2BF791701B258411B2EB17D8DCC9985555D5"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Chapters/NativeChapterService.cs",
+      "bytes": 3759,
+      "sha256": "AE56BD443CBE4B88B012B602BCDEAC9D825B0BC539316D2BA00989F674FA958F"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Chapters/NativeChapterBatch.cs",
+      "bytes": 17901,
+      "sha256": "546D0D6FF1D6C3E420CBDBB7A421515A403381E419F78719CBE76980DC4E0A96"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.App/Web/chapters.js",
+      "bytes": 10386,
+      "sha256": "0795E6FF3E220D510AAEFE223A651EE078B9A2C1E94E91D8626120EDACDB8066"
+    },
+    {
+      "name": "docs/NATIVE-CHAPTERS.md",
+      "bytes": 5995,
+      "sha256": "441E11A73D264031FECCF42680D71CAEFADECDE341736214B4A3976BEA7C87D4"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Chapters.Tests/Program.cs",
+      "bytes": 11447,
+      "sha256": "E692347BE825D85924D411C66D560FD2C4916E39BDD63D60692735F79D74E6AA"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Chapters.Tests/EmbyBlurayHelper.Chapters.Tests.csproj",
+      "bytes": 1303,
+      "sha256": "C7AF829A638909E4192AE00B16BB0FF683FB49239F8D22E0D52FFEF706185407"
+    },
+    {
+      "name": "tests/web/native-chapters.test.cjs",
+      "bytes": 8344,
+      "sha256": "B3D5E181932694E0244A8F7AFB479E385E2925775002B461DC563BBE87A13393"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailPolicy.cs",
+      "bytes": 738,
+      "sha256": "5F3CA0559FC4A4DD5935079E79B3E88A61E643F187266FC461D879BCE2517AF6"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.ProbeWrapper/Thumbnails/DiscThumbnailSession.cs",
+      "bytes": 4852,
+      "sha256": "5FFE53E939B7D43378B9FD41C547A53703FD7D416FE0C552EBBC01D9595B6168"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailService.cs",
+      "bytes": 11958,
+      "sha256": "B7A2D3EA4D28EB73B630CA143E93A6E9696731B7D28DF64DADD4E435DBB85887"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscMediaSession.cs",
+      "bytes": 4064,
+      "sha256": "4E6A3D1989A87212C75ABA28DC03CA4CFDFE1AC6F770A3E5A9A0A130CA2420B2"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailEntryPoint.cs",
+      "bytes": 1301,
+      "sha256": "2ACF172D972A35BB90BCA76161C38AA9B7185754ADB2310B6BA406774E506968"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/AutomaticDiscThumbnailProvider.cs",
+      "bytes": 2018,
+      "sha256": "C36AFD87D12068BEFDB201AE69956991E42249866AD03C4FABF10A72F2E9AFDC"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailTask.cs",
+      "bytes": 2886,
+      "sha256": "0696E56C20B43ECB5A7AFC1107E5FF1C66338EC4B99096BC462B4DFEA9E36A4A"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/EmbyImageExtractor.cs",
+      "bytes": 3439,
+      "sha256": "FA5B43D498E089066087D32DBEF63996AF4599A3214C68E0FD3E4D49C7EB284A"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Thumbnails.Tests/EmbyBlurayHelper.Thumbnails.Tests.csproj",
+      "bytes": 343,
+      "sha256": "EC86F01DC9DC849C4853DACAD562B85CF490EC142AEE8E91FF7A97E11EEF756E"
+    },
+    {
+      "name": "tests/EmbyBlurayHelper.Thumbnails.Tests/Program.cs",
+      "bytes": 4652,
+      "sha256": "44C232B3BF615669F7184D0B7C6A27BC74BB528C1B443F6742F796992B637D8B"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailColorPolicy.cs",
+      "bytes": 2076,
+      "sha256": "64A42A03E46140EA31AA972C65069505B430985731292F0CE29A12E840EF9FDB"
+    },
+    {
+      "name": "docs/DISC-THUMBNAILS.md",
+      "bytes": 7981,
+      "sha256": "076DC7C651F5CD5641D7369C9A349F38974F02890889C495E9E6EAFFADDEA1B1"
+    },
+    {
+      "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/NativeKeyframeExtractorFactory.cs",
+      "bytes": 2767,
+      "sha256": "19DA88B431B60932D7AED99EFCBE204E0FF0BB3DDAF361ECEB9132E58B54D57F"
+    }
+  ],
+  "mainApplicationPdb": {
+    "label": "Main application",
+    "checked": 37,
+    "matches": 37,
+    "checks": [
+      {
+        "name": "src/EmbyBlurayHelper.App/AccountStore.cs",
+        "expectedSha256": "958BB263AA27B91966D331EDE068E70A53EB766732CD1E8D0A8BD16E25909532",
+        "actualSha256": "958BB263AA27B91966D331EDE068E70A53EB766732CD1E8D0A8BD16E25909532",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/Chapters/NativeChapterBatch.cs",
+        "expectedSha256": "546D0D6FF1D6C3E420CBDBB7A421515A403381E419F78719CBE76980DC4E0A96",
+        "actualSha256": "546D0D6FF1D6C3E420CBDBB7A421515A403381E419F78719CBE76980DC4E0A96",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/Chapters/NativeChapterService.cs",
+        "expectedSha256": "AE56BD443CBE4B88B012B602BCDEAC9D825B0BC539316D2BA00989F674FA958F",
+        "actualSha256": "AE56BD443CBE4B88B012B602BCDEAC9D825B0BC539316D2BA00989F674FA958F",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/EmbyIntegration.cs",
+        "expectedSha256": "CDF2E53552C3C10B04F5369464CA681E17D7C2FA15064DE5A425D4791CDE559F",
+        "actualSha256": "CDF2E53552C3C10B04F5369464CA681E17D7C2FA15064DE5A425D4791CDE559F",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/EmbyJsonContent.cs",
+        "expectedSha256": "133B938372E91954BEEC2CE8094EECF9918DF971E0DF24930702098C0561A78D",
+        "actualSha256": "133B938372E91954BEEC2CE8094EECF9918DF971E0DF24930702098C0561A78D",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/EmbyRequestFailure.cs",
+        "expectedSha256": "68C334E15AFE4A4C633CC2FD2BD70875AD5A62A9CC1BC089C9C66FBE624650BD",
+        "actualSha256": "68C334E15AFE4A4C633CC2FD2BD70875AD5A62A9CC1BC089C9C66FBE624650BD",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/HelperLog.cs",
+        "expectedSha256": "7704E54CF52AC7703D6CDF26D62EB8D58B2261C0F26B8B67512597A94619116B",
+        "actualSha256": "7704E54CF52AC7703D6CDF26D62EB8D58B2261C0F26B8B67512597A94619116B",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/IsoPrerequisites.cs",
+        "expectedSha256": "447B4937A650F84B5DC82E64689190AB4593C4251E106B093FAC363071278BAC",
+        "actualSha256": "447B4937A650F84B5DC82E64689190AB4593C4251E106B093FAC363071278BAC",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/LibraryLanguageTask.cs",
+        "expectedSha256": "60E0F0DB71FC36C17F2FA6811E9BC67BC8E9CCECA661ECD63A4F40AB29CCD160",
+        "actualSha256": "60E0F0DB71FC36C17F2FA6811E9BC67BC8E9CCECA661ECD63A4F40AB29CCD160",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/LibraryMediaAnalyzer.cs",
+        "expectedSha256": "F371C6CFB76CEB37FF596EB8F4C8F004A07EF679116204D9B2C0B48F678F3311",
+        "actualSha256": "F371C6CFB76CEB37FF596EB8F4C8F004A07EF679116204D9B2C0B48F678F3311",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/LibraryMediaModels.cs",
+        "expectedSha256": "AC729E3FC87CA4A09B8AE2069AD8D1F50EB2D37D05E491085461F10DDE6BF845",
+        "actualSha256": "AC729E3FC87CA4A09B8AE2069AD8D1F50EB2D37D05E491085461F10DDE6BF845",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/MediaFeatureBatch.cs",
+        "expectedSha256": "64736B7CFD13E42C89DF7A0599AD559364E3267804F85B875E629656399AA14E",
+        "actualSha256": "64736B7CFD13E42C89DF7A0599AD559364E3267804F85B875E629656399AA14E",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/MediaFeatureBatchModels.cs",
+        "expectedSha256": "1DD74C22A2FBC173EFD01C837FA56023EF6C5783647E87CC40687355ADE03393",
+        "actualSha256": "1DD74C22A2FBC173EFD01C837FA56023EF6C5783647E87CC40687355ADE03393",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/MediaFeatureCatalog.cs",
+        "expectedSha256": "BBA2748152AA640721FECCA72C2075D329DCA268C559BB1BE8FBA6DBA3E06B9E",
+        "actualSha256": "BBA2748152AA640721FECCA72C2075D329DCA268C559BB1BE8FBA6DBA3E06B9E",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/MediaFeatureService.cs",
+        "expectedSha256": "9F5470804B183FCEE602BB1247381698758AC9BBF2D844C5E57C3C157F2A9F9A",
+        "actualSha256": "9F5470804B183FCEE602BB1247381698758AC9BBF2D844C5E57C3C157F2A9F9A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/ProbeSettings.cs",
+        "expectedSha256": "2023EFF9A1B7DF7EA85A5C2DC7B2446A2F42EAE59FB591F87C172AC3043FC441",
+        "actualSha256": "2023EFF9A1B7DF7EA85A5C2DC7B2446A2F42EAE59FB591F87C172AC3043FC441",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/Program.cs",
+        "expectedSha256": "759E7DAE9D2962204763FBAB0AF6722F8BE865CC4A687B4889ECFEEA2B0FB7DF",
+        "actualSha256": "759E7DAE9D2962204763FBAB0AF6722F8BE865CC4A687B4889ECFEEA2B0FB7DF",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.App/SettingsStore.cs",
+        "expectedSha256": "6CADAB33F8DE22C6F748BC1645CDF65A9A8AF1765B2F307E2DB39ADA5CE9CDAD",
+        "actualSha256": "6CADAB33F8DE22C6F748BC1645CDF65A9A8AF1765B2F307E2DB39ADA5CE9CDAD",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.Proxy/EmbyProxy.cs",
+        "expectedSha256": "607CFC4A630DE78916BBB29DBE7754754A7A8A9B4BFFB07598045962EE096B12",
+        "actualSha256": "607CFC4A630DE78916BBB29DBE7754754A7A8A9B4BFFB07598045962EE096B12",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.Proxy/EmbyToolProcess.cs",
+        "expectedSha256": "4535113803465B21D84E251EC6907684FBF76C792CFC0675C024FD177133C4CB",
+        "actualSha256": "4535113803465B21D84E251EC6907684FBF76C792CFC0675C024FD177133C4CB",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.Proxy/WholeClipPlaylist.cs",
+        "expectedSha256": "BBCB3E0257BC808D0A8C1A43CBAAE2AEA862D0B69D8B47816F97C0DDDCD25A8C",
+        "actualSha256": "BBCB3E0257BC808D0A8C1A43CBAAE2AEA862D0B69D8B47816F97C0DDDCD25A8C",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.Proxy/ProxyConfiguration.cs",
+        "expectedSha256": "4D7D51B7B9226AA821264F40888202D028A6470740DDE0C26EACE438BDB2D200",
+        "actualSha256": "4D7D51B7B9226AA821264F40888202D028A6470740DDE0C26EACE438BDB2D200",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.Proxy/BlurayLanguageMap.cs",
+        "expectedSha256": "9C24421D42CDBD841E775D962A612944344E938ED0DFF25F3BCE4D7D1F75209D",
+        "actualSha256": "9C24421D42CDBD841E775D962A612944344E938ED0DFF25F3BCE4D7D1F75209D",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.Proxy/TransportLanguagePatcher.cs",
+        "expectedSha256": "67DB077DD8F79C64721E0BEFE6BC037548E5BDB97885CEBF1D72B2F7F6ED17D9",
+        "actualSha256": "67DB077DD8F79C64721E0BEFE6BC037548E5BDB97885CEBF1D72B2F7F6ED17D9",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/ProbeProcess.cs",
+        "expectedSha256": "8EE56D50067A2A22715BFDC090A275121891611F4A49B19F0F2B52268D544657",
+        "actualSha256": "8EE56D50067A2A22715BFDC090A275121891611F4A49B19F0F2B52268D544657",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureAttempt.cs",
+        "expectedSha256": "D6D59E61EB2F5764E19011C929D032D633519358B9D12DDF306606877C5931DA",
+        "actualSha256": "D6D59E61EB2F5764E19011C929D032D633519358B9D12DDF306606877C5931DA",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureEnricher.cs",
+        "expectedSha256": "9E4FA7850DAE86EC41AC6FB000E7129A8F289EEA0C719FE8E81473824BBDC258",
+        "actualSha256": "9E4FA7850DAE86EC41AC6FB000E7129A8F289EEA0C719FE8E81473824BBDC258",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureMerger.cs",
+        "expectedSha256": "957A20EE06627923A7E0B82051ED9FD9B4087048B397B78EEA4BF7EF6CBE238F",
+        "actualSha256": "957A20EE06627923A7E0B82051ED9FD9B4087048B397B78EEA4BF7EF6CBE238F",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureOptions.cs",
+        "expectedSha256": "B5AC29DE5D3B2DC504A378369AF8C70FAEA530EA040185294C3CB0FEA38FBB93",
+        "actualSha256": "B5AC29DE5D3B2DC504A378369AF8C70FAEA530EA040185294C3CB0FEA38FBB93",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureReceipt.cs",
+        "expectedSha256": "B9D62A28BA71E39FB791BD2A06EC75CA2E5D5A36E4675F7B7C489BCCF19EE868",
+        "actualSha256": "B9D62A28BA71E39FB791BD2A06EC75CA2E5D5A36E4675F7B7C489BCCF19EE868",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs",
+        "expectedSha256": "69628C101E1C1177D4A9C7DCEE2C813BB12590099FB857CE0F77880A3212E0ED",
+        "actualSha256": "69628C101E1C1177D4A9C7DCEE2C813BB12590099FB857CE0F77880A3212E0ED",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/DiscChapterReader.cs",
+        "expectedSha256": "6102E989A7E0332FB782F6B1392FD1C7FE9121FF386DBF498B4F9600FB156D32",
+        "actualSha256": "6102E989A7E0332FB782F6B1392FD1C7FE9121FF386DBF498B4F9600FB156D32",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/Thumbnails/DiscThumbnailSession.cs",
+        "expectedSha256": "5FFE53E939B7D43378B9FD41C547A53703FD7D416FE0C552EBBC01D9595B6168",
+        "actualSha256": "5FFE53E939B7D43378B9FD41C547A53703FD7D416FE0C552EBBC01D9595B6168",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs",
+        "expectedSha256": "AE5A54217D10A6057B4340A13336DF11F71BF73A6035CA8152258F7C4F93546A",
+        "actualSha256": "AE5A54217D10A6057B4340A13336DF11F71BF73A6035CA8152258F7C4F93546A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/IsoMediaProbe.cs",
+        "expectedSha256": "1174608A219F0A527AA8CD7C82DAD340FB93857C7F4BB00CEFA77CC229EE324A",
+        "actualSha256": "1174608A219F0A527AA8CD7C82DAD340FB93857C7F4BB00CEFA77CC229EE324A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/ProbeConfiguration.cs",
+        "expectedSha256": "3769F2005EFA0002AB1C62CCE83ECF793E8C0A151201BC69DBF7C48A7F87D4AD",
+        "actualSha256": "3769F2005EFA0002AB1C62CCE83ECF793E8C0A151201BC69DBF7C48A7F87D4AD",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs",
+        "expectedSha256": "DF7C0AB7B3E423769DF172F370CF1513321086D7F398B346D3A49BE69D65061C",
+        "actualSha256": "DF7C0AB7B3E423769DF172F370CF1513321086D7F398B346D3A49BE69D65061C",
+        "match": true
+      }
+    ]
+  },
+  "embyPluginPdb": {
+    "label": "Emby plugin",
+    "checked": 26,
+    "matches": 26,
+    "checks": [
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/AutomaticChapterProvider.cs",
+        "expectedSha256": "06C2B6FCBA7CFCFC6EAA76E824BD0320147E8AFF8A3A0C087360E5C1136FBE2F",
+        "actualSha256": "06C2B6FCBA7CFCFC6EAA76E824BD0320147E8AFF8A3A0C087360E5C1136FBE2F",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/ChapterProcess.cs",
+        "expectedSha256": "B986265B60A7E8CB1AAD18B45A6E2BF791701B258411B2EB17D8DCC9985555D5",
+        "actualSha256": "B986265B60A7E8CB1AAD18B45A6E2BF791701B258411B2EB17D8DCC9985555D5",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/ChapterService.cs",
+        "expectedSha256": "8CED29264A60CCC2AA6C4CE7CDC6455C7CEE530CD9DC5D0569298A48F71242C4",
+        "actualSha256": "8CED29264A60CCC2AA6C4CE7CDC6455C7CEE530CD9DC5D0569298A48F71242C4",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/ChapterWriter.cs",
+        "expectedSha256": "F8051067D25E269CB042C66916312795985366FDB72B0011D306D8CD273CB358",
+        "actualSha256": "F8051067D25E269CB042C66916312795985366FDB72B0011D306D8CD273CB358",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Chapters/NativeChapterMerge.cs",
+        "expectedSha256": "55477A2092B42AB33CD790AAC792BFD304819D09C0E29431B686104240BB4C21",
+        "actualSha256": "55477A2092B42AB33CD790AAC792BFD304819D09C0E29431B686104240BB4C21",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/MediaFeatures/AutomaticMediaFeatureProvider.cs",
+        "expectedSha256": "457D5DDB965C55730F6F136ABDF06DC35254203ED366C2518A8FDFEBADA82C6E",
+        "actualSha256": "457D5DDB965C55730F6F136ABDF06DC35254203ED366C2518A8FDFEBADA82C6E",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/MediaFeatures/FeatureStreamMerge.cs",
+        "expectedSha256": "B6343C022E46C73D5C69CB9E62E16FBB6457E270452DE7FC4F9CAD845FFFCA05",
+        "actualSha256": "B6343C022E46C73D5C69CB9E62E16FBB6457E270452DE7FC4F9CAD845FFFCA05",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/BluRayMediaProbe.cs",
+        "expectedSha256": "93E07EFC581D2888731F4432F8A4334EB54F428CB08C2560933AA87EC75CF7D6",
+        "actualSha256": "93E07EFC581D2888731F4432F8A4334EB54F428CB08C2560933AA87EC75CF7D6",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/BluRaySourceResolver.cs",
+        "expectedSha256": "0C7BF99A2A24E820B95E4F49A7BD9ADFBDEFE6FDCB6A7189C211325A66988FD2",
+        "actualSha256": "0C7BF99A2A24E820B95E4F49A7BD9ADFBDEFE6FDCB6A7189C211325A66988FD2",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/MediaFacts.cs",
+        "expectedSha256": "0DD2D4B490951CCC25DC9B4DE1FB50872D74CBB7FC0081D5FFC99C6A3D1EDEC6",
+        "actualSha256": "0DD2D4B490951CCC25DC9B4DE1FB50872D74CBB7FC0081D5FFC99C6A3D1EDEC6",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Media/SavedBluRayMedia.cs",
+        "expectedSha256": "41CC4E81217648B95A235F310B1AF60C33F8B97E0154343A7D8C0C76ABDE12AD",
+        "actualSha256": "41CC4E81217648B95A235F310B1AF60C33F8B97E0154343A7D8C0C76ABDE12AD",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Persistence/BluRayMediaWriter.cs",
+        "expectedSha256": "96574574624C86C89F0AA34C7354529DBB2D3DA776B5D6799FDD9294B2C26A33",
+        "actualSha256": "96574574624C86C89F0AA34C7354529DBB2D3DA776B5D6799FDD9294B2C26A33",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Plugin.cs",
+        "expectedSha256": "E14DB104F470D912B0B0A8C55501E7746C6D3ABF5076F55A3AAF3662F8DDC32A",
+        "actualSha256": "E14DB104F470D912B0B0A8C55501E7746C6D3ABF5076F55A3AAF3662F8DDC32A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/ProbeBluRayMediaService.cs",
+        "expectedSha256": "83FFB4E02DA6F6124716A80721B658045EA6DFB164E34BAFADC898C77816E104",
+        "actualSha256": "83FFB4E02DA6F6124716A80721B658045EA6DFB164E34BAFADC898C77816E104",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/ProbeRequests.cs",
+        "expectedSha256": "A2F336CA75CAACEFA40AFC4C7E2EFC167CFF41F121C2F4D2C79577BAAA9A250A",
+        "actualSha256": "A2F336CA75CAACEFA40AFC4C7E2EFC167CFF41F121C2F4D2C79577BAAA9A250A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/StreamMerge.cs",
+        "expectedSha256": "C9D34F1668BB69A78A6297304D94C0BFF80F780FDFA8A7D0BE0601753A88A8FC",
+        "actualSha256": "C9D34F1668BB69A78A6297304D94C0BFF80F780FDFA8A7D0BE0601753A88A8FC",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/AutomaticDiscThumbnailProvider.cs",
+        "expectedSha256": "C36AFD87D12068BEFDB201AE69956991E42249866AD03C4FABF10A72F2E9AFDC",
+        "actualSha256": "C36AFD87D12068BEFDB201AE69956991E42249866AD03C4FABF10A72F2E9AFDC",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscMediaSession.cs",
+        "expectedSha256": "4E6A3D1989A87212C75ABA28DC03CA4CFDFE1AC6F770A3E5A9A0A130CA2420B2",
+        "actualSha256": "4E6A3D1989A87212C75ABA28DC03CA4CFDFE1AC6F770A3E5A9A0A130CA2420B2",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailColorPolicy.cs",
+        "expectedSha256": "64A42A03E46140EA31AA972C65069505B430985731292F0CE29A12E840EF9FDB",
+        "actualSha256": "64A42A03E46140EA31AA972C65069505B430985731292F0CE29A12E840EF9FDB",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailEntryPoint.cs",
+        "expectedSha256": "2ACF172D972A35BB90BCA76161C38AA9B7185754ADB2310B6BA406774E506968",
+        "actualSha256": "2ACF172D972A35BB90BCA76161C38AA9B7185754ADB2310B6BA406774E506968",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailPolicy.cs",
+        "expectedSha256": "5F3CA0559FC4A4DD5935079E79B3E88A61E643F187266FC461D879BCE2517AF6",
+        "actualSha256": "5F3CA0559FC4A4DD5935079E79B3E88A61E643F187266FC461D879BCE2517AF6",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailService.cs",
+        "expectedSha256": "B7A2D3EA4D28EB73B630CA143E93A6E9696731B7D28DF64DADD4E435DBB85887",
+        "actualSha256": "B7A2D3EA4D28EB73B630CA143E93A6E9696731B7D28DF64DADD4E435DBB85887",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailTask.cs",
+        "expectedSha256": "0696E56C20B43ECB5A7AFC1107E5FF1C66338EC4B99096BC462B4DFEA9E36A4A",
+        "actualSha256": "0696E56C20B43ECB5A7AFC1107E5FF1C66338EC4B99096BC462B4DFEA9E36A4A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/EmbyImageExtractor.cs",
+        "expectedSha256": "FA5B43D498E089066087D32DBEF63996AF4599A3214C68E0FD3E4D49C7EB284A",
+        "actualSha256": "FA5B43D498E089066087D32DBEF63996AF4599A3214C68E0FD3E4D49C7EB284A",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/NativeKeyframeExtractorFactory.cs",
+        "expectedSha256": "19DA88B431B60932D7AED99EFCBE204E0FF0BB3DDAF361ECEB9132E58B54D57F",
+        "actualSha256": "19DA88B431B60932D7AED99EFCBE204E0FF0BB3DDAF361ECEB9132E58B54D57F",
+        "match": true
+      },
+      {
+        "name": "src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureReceipt.cs",
+        "expectedSha256": "B9D62A28BA71E39FB791BD2A06EC75CA2E5D5A36E4675F7B7C489BCCF19EE868",
+        "actualSha256": "B9D62A28BA71E39FB791BD2A06EC75CA2E5D5A36E4675F7B7C489BCCF19EE868",
+        "match": true
+      }
+    ]
+  },
+  "embyPluginPdbIdentity": {
+    "match": true,
+    "guid": "2a3811e3-fbc5-4c7d-a682-d7a34e781231",
+    "stamp": 3283327612
+  },
+  "embeddedWebResources": {
+    "originalCount": 5,
+    "rebuiltCount": 5,
+    "matches": 5,
+    "checks": [
+      {
+        "name": "EmbyBlurayHelper.App.Web.app.css",
+        "sha256": "C48BA43C445258455CDF000E5DB11DCD296E228FEA66C12C6DB346DB201B5544",
+        "match": true
+      },
+      {
+        "name": "EmbyBlurayHelper.App.Web.app.js",
+        "sha256": "D4CB8B10F557E781D1EAD5CB7CF2ABB4A05B01A4C6EDDDB3E917170553768058",
+        "match": true
+      },
+      {
+        "name": "EmbyBlurayHelper.App.Web.chapters.js",
+        "sha256": "0795E6FF3E220D510AAEFE223A651EE078B9A2C1E94E91D8626120EDACDB8066",
+        "match": true
+      },
+      {
+        "name": "EmbyBlurayHelper.App.Web.media-features.js",
+        "sha256": "403AD6E73FBBBF0D19AB296FBF69B6FEB68B3531A73E6EB33712645359AF89E6",
+        "match": true
+      },
+      {
+        "name": "EmbyBlurayHelper.App.Web.index.html",
+        "sha256": "1106EC60CA23D36FA2485991721E0C60D58A5E73383789FBECA85C72A6740A4F",
+        "match": true
+      }
+    ]
+  },
+  "referenceArtifacts": [
+    {
+      "label": "Original helper executable",
+      "sha256": "AEFAF99C6BBBA31E3732C4E1B9258A0771962A6DBA6626F53772B12D35607E5F"
+    },
+    {
+      "label": "Original helper PDB",
+      "sha256": "95755AE63C3483B1B767F052EE2B8F67D232366CE47A5E39AF077599A4AA790A"
+    },
+    {
+      "label": "Original Emby plugin",
+      "sha256": "8BC9DB8FF0376B2B2DF3354E0A10FC8C8D37FF6804395345FF59D901A4D8D2EC"
+    },
+    {
+      "label": "Verified original plugin PDB",
+      "sha256": "39C123A27E15BAFA85114A63955E4048D861B0EE4AA968B4643BD3C1C3FEFC73"
+    }
+  ],
+  "validation": {
+    "dotnetSdk": "8.0.427",
+    "node": "v22.18.0",
+    "applicationBuild": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "embyPluginBuild": {
+      "errors": 0,
+      "warnings": 6,
+      "warningCode": "MSB3277",
+      "note": "Unmodified historical source; framework reference version conflicts against Emby 4.10.2 assemblies."
+    },
+    "applicationChecks": 125,
+    "transportAndPlaylistChecks": 169,
+    "nativeChapterChecks": 27,
+    "libraryWebChecks": 37,
+    "mediaFeatureWebChecks": 19,
+    "nativeChapterWebChecks": 25,
+    "webDependency": "Reused existing project-local jsdom through an ignored directory junction; no test source modified.",
+    "phonePlaybackRetested": false,
+    "runningServicesChanged": false
+  },
+  "limitations": [
+    "No original Git commit exists for the target source snapshot in the audited local references, reflogs, unreachable objects, or advertised remote references.",
+    "Documentation, tests and packaging were replayed from historical patches; PDB checks only verify compiled C# documents, and executable resource hashes independently verify the five embedded Web files.",
+    "This recovery is not a new claim of Infuse device compatibility."
+  ]
+}

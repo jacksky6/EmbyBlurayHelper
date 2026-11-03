@@ -1,0 +1,3 @@
+#!/bin/sh
+# DSM keeps SYNOPKG_PKGVAR across upgrades. Never move or overwrite its contents.
+exit 0

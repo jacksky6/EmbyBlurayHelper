@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="artifacts/**/*.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs" Link="BluRayLanguageAugmenter.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/ProbeProcess.cs" Link="ProbeProcess.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/MediaFeatures/*.cs" Link="MediaFeatures/%(Filename)%(Extension)" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs" Link="IsoDiscMetadata.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs" Link="IsoMediaHttpSource.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoMediaProbe.cs" Link="IsoMediaProbe.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/EmbyToolProcess.cs" Link="EmbyToolProcess.cs" />
+    <PackageReference Include="BDInfo" Version="0.8.0" />
+    <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
+  </ItemGroup>
+</Project>

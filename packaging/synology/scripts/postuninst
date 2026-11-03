@@ -1,0 +1,3 @@
+#!/bin/sh
+# No shared media, Emby files, or configuration are deleted by this script.
+exit 0
