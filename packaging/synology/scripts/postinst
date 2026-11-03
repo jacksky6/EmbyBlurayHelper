@@ -1,0 +1,8 @@
+#!/bin/sh
+. "$(dirname "$0")/common.sh"
+helper_prepare
+if ! "$helper_exe" --helper-version; then
+    helper_message 'The .NET runtime could not start. See /var/log/packages/EmbyBlurayHelper.log for the missing library or GLIBC version.'
+    exit 1
+fi
+helper_message 'Open http://NAS-IP:8099 and sign in with admin / 123456. Grant embyblurayhelper read-only access to the media shared folders in DSM.'

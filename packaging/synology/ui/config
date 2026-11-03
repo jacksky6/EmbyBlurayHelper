@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "com.embyblurayhelper.console": {
+      "title": "EmbyBlurayHelper",
+      "desc": "Emby / Infuse Blu-ray language helper",
+      "icon": "images/EmbyBlurayHelper-{0}.png",
+      "type": "url",
+      "protocol": "http",
+      "port": "8099",
+      "url": "/",
+      "allUsers": false
+    }
+  }
+}

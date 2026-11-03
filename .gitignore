@@ -1,6 +1,8 @@
 bin/
 obj/
 artifacts/
+data/
 emby-bluray-helper.json
+emby-bluray-helper-proxy.json
 *.user
 *.suo

@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+case "$(uname -m)" in
+    x86_64) ;;
+    *) echo 'This package requires an Intel/AMD 64-bit (x86_64) NAS.' >&2; exit 1 ;;
+esac
+if [ "${SYNOPKG_DSM_VERSION_MAJOR:-7}" -lt 7 ] ||
+   { [ "${SYNOPKG_DSM_VERSION_MAJOR:-7}" -eq 7 ] && [ "${SYNOPKG_DSM_VERSION_MINOR:-2}" -lt 2 ]; }; then
+    echo 'DSM 7.2 or later is required.' >&2
+    exit 1
+fi

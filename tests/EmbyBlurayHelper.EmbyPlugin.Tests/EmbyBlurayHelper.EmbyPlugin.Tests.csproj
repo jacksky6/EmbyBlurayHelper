@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/StreamMerge.cs" Link="StreamMerge.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/MediaFeatures/FeatureStreamMerge.cs" Link="FeatureStreamMerge.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Media/MediaFacts.cs" Link="MediaFacts.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Media/BluRaySourceResolver.cs" Link="BluRaySourceResolver.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Chapters/NativeChapterMerge.cs" Link="NativeChapterMerge.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailPolicy.cs" Link="DiscThumbnailPolicy.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/DiscThumbnailColorPolicy.cs" Link="DiscThumbnailColorPolicy.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Thumbnails/NativeKeyframeExtractorFactory.cs" Link="NativeKeyframeExtractorFactory.cs" />
+    <PackageReference Include="mediabrowser.server.core" Version="4.9.1.90" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+#!/bin/sh
+. "$(dirname "$0")/common.sh"
+# An upgrade also invokes preuninst; do not detach the probe in that case.
+if [ "${SYNOPKG_PKG_STATUS:-}" = UNINSTALL ] && [ -f "$helper_var/data/emby-probe-backup.json" ]; then
+    if ! "$helper_exe" --prepare-uninstall; then
+        helper_message 'Cannot restore the Emby probe. Start Emby, verify the API key, then use Restore original probe in the helper Web console before uninstalling.'
+        exit 1
+    fi
+fi

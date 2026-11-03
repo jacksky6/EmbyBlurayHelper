@@ -9,6 +9,8 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../EmbyBlurayHelper.Proxy/EmbyToolProcess.cs" Link="EmbyToolProcess.cs" />
     <PackageReference Include="BDInfo" Version="0.8.0" />
+    <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
   </ItemGroup>
 </Project>

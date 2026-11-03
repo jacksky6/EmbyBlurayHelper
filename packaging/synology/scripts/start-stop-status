@@ -1,0 +1,44 @@
+#!/bin/sh
+. "$(dirname "$0")/common.sh"
+
+case "${1:-}" in
+    prestart)
+        [ -x "$helper_exe" ] || exit 150
+        ;;
+    start)
+        if helper_running; then exit 0; fi
+        helper_prepare
+        if [ -f "$helper_bootlog" ] && [ "$(wc -c < "$helper_bootlog")" -gt 1048576 ]; then
+            mv -f "$helper_bootlog" "$helper_bootlog.previous"
+        fi
+        cd "$helper_target"
+        nohup "$helper_exe" --serve >> "$helper_bootlog" 2>&1 < /dev/null &
+        helper_pid=$!
+        printf '%s\n' "$helper_pid" > "$helper_pidfile"
+        sleep 2
+        if ! helper_running; then
+            helper_message "Helper failed to start. See $helper_bootlog and /var/log/packages/EmbyBlurayHelper.log."
+            tail -n 15 "$helper_bootlog" >&2
+            exit 1
+        fi
+        ;;
+    stop)
+        if helper_running; then
+            kill -TERM "$helper_pid"
+            helper_wait=0
+            while helper_running && [ "$helper_wait" -lt 25 ]; do
+                sleep 1
+                helper_wait=$((helper_wait + 1))
+            done
+            if helper_running; then kill -KILL "$helper_pid"; fi
+        fi
+        rm -f "$helper_pidfile"
+        ;;
+    status)
+        if helper_running; then echo 'EmbyBlurayHelper is running'; exit 0; fi
+        exit 3
+        ;;
+    prestop) ;;
+    log) printf '%s\n' "$helper_bootlog" ;;
+    *) echo 'Usage: start-stop-status {start|stop|status|prestart|prestop|log}' >&2; exit 1 ;;
+esac

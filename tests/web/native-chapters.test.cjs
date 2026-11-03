@@ -1,0 +1,66 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const {JSDOM} = require(path.resolve(process.argv[2] || 'artifacts/ui-check/node_modules/jsdom'));
+const root = path.resolve(__dirname,'../..');
+const dom = new JSDOM(fs.readFileSync(path.join(root,'src/EmbyBlurayHelper.App/Web/index.html'),'utf8'),{url:'http://localhost/#chapters',runScripts:'outside-only',pretendToBeVisual:true});
+const w=dom.window,d=w.document,calls=[],timers=new Map(); let checks=0,next=1;
+const check=(ok,message)=>{assert.ok(ok,message);checks++;};
+const evaluate=code=>vm.runInContext(code,dom.getInternalVMContext());
+const movie=(id,libs,state)=>({id,name:'影片 <'+id+'>',libraryIds:libs,pending:state!=='managed'&&state!=='existing',result:'pending',message:'',sources:[{id,kind:id==='iso'?'ISO':'BDMV',state,count:state==='managed'?20:0,playlist:''}]});
+let fixture={id:'plan',status:'ready',active:false,canFill:true,scanComplete:true,connectionMatches:true,message:'检查完成',planned:0,processed:0,completed:0,failed:0,skipped:0,selectedLibraryIds:[],includeVerified:false,
+ summary:{discs:3,verified:0,pending:2,preserved:1},libraries:[{id:'a',name:'媒体库 <A>',moviesChecked:3,scanComplete:true,discs:2,verified:0,pending:1,preserved:1},{id:'b',name:'B',moviesChecked:2,scanComplete:true,discs:1,verified:0,pending:1,preserved:0}],
+ items:[movie('bd',['a'],'generated'),movie('custom',['a'],'existing'),movie('iso',['b'],'empty')]};
+let status={enabled:true,automatic:true,ready:true,readerPath:'/helper/EmbyBlurayHelper',checkedItems:0};
+w.setTimeout=(fn,ms)=>{const id=next++;timers.set(id,{fn,ms});return id;};w.clearTimeout=id=>timers.delete(id);
+w.fetch=async(url,options)=>{
+ calls.push({url,options});let result=url.endsWith('/api/chapters')?status:fixture;
+ if(url.endsWith('/fill')){const b=JSON.parse(options.body);fixture={...fixture,status:'filling',active:true,planned:1,selectedLibraryIds:b.libraryIds};result=fixture;}
+ return{status:200,ok:true,headers:{get:()=> 'application/json'},json:async()=>structuredClone(result)};
+};
+evaluate(fs.readFileSync(path.join(root,'src/EmbyBlurayHelper.App/Web/app.js'),'utf8').replace('startConsole().catch(()=>{});',''));
+evaluate("configuration={};$('#console').hidden=false;");
+evaluate(fs.readFileSync(path.join(root,'src/EmbyBlurayHelper.App/Web/chapters.js'),'utf8'));
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+(async()=>{
+ w.dispatchEvent(new w.Event('helper:navigate'));await settle();
+ check(!!d.querySelector('nav > [data-page="chapters"]'),'chapters is a top-level page');
+ check(d.querySelector('#chapter-pending').textContent==='2'&&d.querySelector('#chapter-preserved').textContent==='1','pending and preserved are distinct');
+ check(d.querySelector('#chapter-fill').textContent.includes('2 部'),'only pending discs count by default');
+ check(!d.querySelector('#chapter-groups a')&&d.querySelector('#chapter-groups').textContent.includes('<A>'),'library names are escaped');
+ check(!d.querySelector('#chapter-rows bd')&&d.querySelector('#chapter-rows').textContent.includes('<bd>'),'movie names are escaped');
+ check(![...timers.values()].some(t=>t.ms===2000),'idle state does not poll');
+ d.querySelector('#chapter-select-all').checked=false;d.querySelector('#chapter-select-all').dispatchEvent(new w.Event('change'));
+ const before=calls.length;await d.querySelector('#chapter-fill').onclick();check(calls.length===before&&d.querySelector('#chapter-fill').disabled,'empty scope blocked in UI and handler');
+ const a=d.querySelector('[data-chapter-library="a"]');a.checked=true;a.dispatchEvent(new w.Event('change',{bubbles:true}));
+ check(d.querySelector('#chapter-fill').textContent.includes('1 部')&&d.querySelector('#chapter-select-all').indeterminate,'partial library selection updates counts');
+ await d.querySelector('#chapter-fill').onclick();const body=JSON.parse(calls.find(c=>c.url.endsWith('/fill')).options.body);
+ check(body.libraryIds.join(',')==='a'&&!body.includeVerified,'only selected libraries sent');
+ check([...d.querySelectorAll('[data-chapter-library]')].every(el=>el.disabled),'active task locks scope');
+ check([...timers.values()].some(t=>t.ms===2000),'visible active task polls progress');
+ w.history.replaceState(null,'','#infuse');w.dispatchEvent(new w.Event('helper:navigate'));check(![...timers.values()].some(t=>t.ms===2000),'leaving page stops polling');
+ fixture={...fixture,status:'completed',active:false,processed:1,completed:1,items:[movie('bd',['a'],'managed'),movie('custom',['a'],'existing'),movie('iso',['b'],'empty')],summary:{discs:3,verified:1,pending:1,preserved:1}};
+ w.history.replaceState(null,'','#chapters');w.dispatchEvent(new w.Event('helper:navigate'));await settle();
+ check(d.querySelector('#chapter-fill').disabled&&!d.querySelector('[data-chapter-library="b"]').checked,'selection retained after refresh and completed scope has no pending');
+ d.querySelector('#chapter-recheck').checked=true;d.querySelector('#chapter-recheck').dispatchEvent(new w.Event('change'));check(!d.querySelector('#chapter-fill').disabled,'explicit recheck enables completed sources');
+ status={...status,ready:false,error:'请安装 DLL 并重启 Emby'};await d.querySelector('#chapter-refresh').onclick();check(d.querySelector('#chapter-fill').disabled&&d.querySelector('#chapter-status-copy').textContent.includes('重启'),'missing plugin disables fill and explains restart');
+ fixture={...fixture,id:'new-fast-scan',status:'scanning',active:true,libraries:[],items:[]};await d.querySelector('#chapter-refresh').onclick();
+ fixture={...fixture,status:'ready',active:false,libraries:[{id:'a',name:'A',scanComplete:true,moviesChecked:1,discs:1,pending:1,verified:0,preserved:0}],items:[movie('new',['a'],'empty')]};
+ status={...status,ready:true,error:null};await d.querySelector('#chapter-refresh').onclick();check(d.querySelector('[data-chapter-library="a"]').checked,'fast scan arriving after an empty initial response selects libraries');
+ check(![...timers.values()].some(t=>t.ms===2000),'finished task stops progress refresh');
+ status={...status,thumbnails:{available:true,followsEmby:true,worker:{state:'Idle'},libraries:[{id:'a',name:'库 <script>test</script>',mode:'task',interval:-1,saveLocal:false},{id:'b',name:'B',mode:'never',interval:10,saveLocal:true}]}};
+ await d.querySelector('#chapter-refresh').onclick();
+ check(d.querySelector('#chapter-thumbnail-libraries').textContent.includes('作为计划任务')&&d.querySelector('#chapter-thumbnail-libraries').textContent.includes('章节标记'),'native thumbnail mode and interval are displayed');
+ check(!d.querySelector('#chapter-thumbnail-libraries script')&&d.querySelector('#chapter-thumbnail-libraries').textContent.includes('<script>'),'thumbnail library names cannot inject markup');
+ check(!d.querySelector('#chapter-thumbnail-libraries input'),'native thumbnail policy is read-only in Helper');
+ status.thumbnails.worker={state:'Running',progress:42};await d.querySelector('#chapter-refresh').onclick();
+ check(d.querySelector('#chapter-thumbnail-state').textContent.includes('42%')&&[...timers.values()].some(t=>t.ms===2000),'running Emby disc task displays progress and refreshes only while active');
+ status.thumbnails.worker={state:'Idle',lastStatus:'Failed',error:'<img>decode failure'};await d.querySelector('#chapter-refresh').onclick();
+ check(!d.querySelector('#chapter-thumbnail-state img')&&d.querySelector('#chapter-thumbnail-state').textContent.includes('decode failure'),'native task errors render as plain text');
+ check(![...timers.values()].some(t=>t.ms===2000),'idle thumbnail state stops polling');
+ status.thumbnails.worker={state:'Idle',lastStatus:'Cancelled'};status.thumbnails.libraries[0].saveLocal=true;await d.querySelector('#chapter-refresh').onclick();
+ check(d.querySelector('#chapter-thumbnail-state').textContent.includes('已停止'),'canceled native task has an explicit retained-image status');
+ check(d.querySelector('#chapter-thumbnail-libraries tr td:last-child').textContent==='Emby 元数据目录','chapter JPEG location is accurate even when local BIF storage is enabled');
+ console.log(`Passed ${checks} native chapter Web checks.`);
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>w.close());

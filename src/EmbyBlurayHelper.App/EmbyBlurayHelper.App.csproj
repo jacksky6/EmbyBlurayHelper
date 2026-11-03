@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>EmbyBlurayHelper</AssemblyName>
+    <Version>0.2.0</Version>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PredefinedCulturesOnly>false</PredefinedCulturesOnly>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BDInfo" Version="0.8.0" />
+    <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/EmbyProxy.cs" Link="Core/EmbyProxy.cs" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/Chapters/*.cs" Link="InfuseChapters/%(Filename)%(Extension)" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/EmbyToolProcess.cs" Link="Core/EmbyToolProcess.cs" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/WholeClipPlaylist.cs" Link="Core/WholeClipPlaylist.cs" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/ProxyConfiguration.cs" Link="Core/ProxyConfiguration.cs" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/BlurayLanguageMap.cs" Link="Core/BlurayLanguageMap.cs" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/TransportLanguagePatcher.cs" Link="Core/TransportLanguagePatcher.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/ProbeProcess.cs" Link="Core/ProbeProcess.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/MediaFeatures/*.cs" Link="Core/MediaFeatures/%(Filename)%(Extension)" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs" Link="Core/IsoDiscMetadata.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/DiscChapterReader.cs" Link="Core/DiscChapterReader.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/Thumbnails/*.cs" Link="Thumbnails/%(Filename)%(Extension)" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs" Link="Core/IsoMediaHttpSource.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/IsoMediaProbe.cs" Link="Core/IsoMediaProbe.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/ProbeConfiguration.cs" Link="Core/ProbeConfiguration.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs" Link="Core/BluRayLanguageAugmenter.cs" />
+    <EmbeddedResource Include="Web/*" />
+    <Content Remove="Web/**" />
+  </ItemGroup>
+</Project>

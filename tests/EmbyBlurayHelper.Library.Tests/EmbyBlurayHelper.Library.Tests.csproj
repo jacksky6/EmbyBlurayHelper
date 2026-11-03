@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/LibraryLanguageTask.cs" Link="LibraryLanguageTask.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/LibraryMediaAnalyzer.cs" Link="LibraryMediaAnalyzer.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/LibraryMediaModels.cs" Link="LibraryMediaModels.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/EmbyJsonContent.cs" Link="EmbyJsonContent.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/IsoPrerequisites.cs" Link="IsoPrerequisites.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/EmbyRequestFailure.cs" Link="EmbyRequestFailure.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/EmbyToolProcess.cs" Link="EmbyToolProcess.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/SettingsStore.cs" Link="SettingsStore.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/HelperLog.cs" Link="HelperLog.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.App/ProbeSettings.cs" Link="ProbeSettings.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/ProxyConfiguration.cs" Link="ProxyConfiguration.cs" />
+  </ItemGroup>
+</Project>
