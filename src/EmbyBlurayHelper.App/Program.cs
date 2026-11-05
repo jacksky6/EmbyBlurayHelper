@@ -240,6 +240,9 @@ app.MapPost("/api/detect", () => EmbyIntegration.Detect());
 app.MapPost("/api/emby/test", (CancellationToken token) => integration.Test(token));
 app.MapGet("/api/probe/status", (CancellationToken token) => integration.GetProbeStatus(token));
 app.MapGet("/api/infuse/multiclip", () => integration.GetMultiClipStatus());
+// Read-only: from the persisted listing record; never reads media files.
+app.MapGet("/api/infuse/chapters", () => { var (available, unavailable) = discListings.Summary();
+    return new { enabled = settings.Current.EnableInfuseChapters, available, unavailable = unavailable.Select(u => new { itemId = u.ItemId, name = u.Name, reason = u.Reason }) }; });
 app.MapPost("/api/infuse/multiclip", (ProbeToggleInput input, CancellationToken token) => integration.SetMultiClipEnabled(input.Enabled, token));
 app.MapPost("/api/probe/toggle", (ProbeToggleInput input, CancellationToken token) => integration.SetProbeEnabled(input.Enabled, token));
 app.MapPost("/api/probe/check", (CancellationToken token) => integration.CheckProbe(token));

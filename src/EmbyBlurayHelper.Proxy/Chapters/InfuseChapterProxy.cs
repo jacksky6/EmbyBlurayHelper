@@ -108,11 +108,12 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
                         if (!source.TryGetProperty("Id", out var sourceId)) continue;
                         var copy = source.Clone();
                         var path = copy.TryGetProperty("Path", out var value) ? value.GetString() ?? "" : "";
+                        var origin = SourceOf(item, copy);
                         // Known items are answered from the record without a disk read.
-                        var task = listings.TryGet(DiscListingStore.Key(copy), out var known) ? Task.FromResult(known) : Task.Run(async () =>
+                        var task = listings.TryGet(DiscListingStore.Key(copy), origin, out var known) ? Task.FromResult(known) : Task.Run(async () =>
                         {
                             await throttle.WaitAsync(context.RequestAborted);
-                            try { return Describe(copy); } finally { throttle.Release(); }
+                            try { return Describe(copy, origin); } finally { throttle.Release(); }
                         });
                         builds.Add((itemId.GetString()!, sourceId.GetString()!, path, task));
                     }
@@ -161,50 +162,58 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         return fields.Length == 0 ? "none" : Regex.IsMatch(fields, "^[A-Za-z0-9,]{1,400}$") ? fields : "unrecognized";
     }
 
-    private DiscChapterPresentation? Build(JsonElement source)
+    private DiscChapterPresentation? Build(JsonElement source, DiscListingStore.Source? origin)
     {
         var key = "chapter-disc:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source.GetRawText())));
         if (cache.TryGetValue<DiscChapterPresentation>(key, out var cached) && cached!.IsCurrent) return cached;
-        var (presentation, definite) = TryCreate(source);
+        var (presentation, definite, reason) = TryCreate(source);
         if (presentation is not null) cache.Set(key, presentation, new MemoryCacheEntryOptions { Size = Math.Max(1, (presentation.Image.MetadataBytes + 1048575) / 1048576), AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1) });
         // Playback reads the disc anyway; keep the listing record in step with it.
-        if (definite) { listings.Put(DiscListingStore.Key(source), ToListing(presentation)); listings.Flush(); }
+        if (definite) { listings.Put(DiscListingStore.Key(source), ToListing(presentation), origin, reason); listings.Flush(); }
         return presentation;
     }
 
     // Library syncs only consult the listing record. The disc itself is read
     // once per Emby record, never on every sync.
-    private DiscListingStore.Listing? Describe(JsonElement source)
+    private DiscListingStore.Listing? Describe(JsonElement source, DiscListingStore.Source origin)
     {
         var key = DiscListingStore.Key(source);
-        if (listings.TryGet(key, out var known)) return known;
-        var (presentation, definite) = TryCreate(source);
-        if (definite) listings.Put(key, ToListing(presentation)); else listings.Defer(key);
+        if (listings.TryGet(key, origin, out var known)) return known;
+        var (presentation, definite, reason) = TryCreate(source);
+        if (definite) listings.Put(key, ToListing(presentation), origin, reason); else listings.Defer(key);
         return ToListing(presentation);
     }
 
     private static DiscListingStore.Listing? ToListing(DiscChapterPresentation? p) =>
         p is null ? null : new(p.Image.Length, p.ChapterCount, p.Playlist, p.Image.MetadataBytes);
 
+    private static bool IsDisc(JsonElement source) =>
+        source.TryGetProperty("Container", out var container) && string.Equals(container.GetString(), "bluray", StringComparison.OrdinalIgnoreCase);
+
+    private static DiscListingStore.Source SourceOf(JsonElement item, JsonElement source) =>
+        new(item.GetProperty("Id").GetString()!, item.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "", source.GetProperty("Id").GetString()!, IsDisc(source));
+
     // Definite results are properties of the disc and Emby's record. I/O and
     // permission failures (an unmounted or sleeping-and-failing volume) are not.
-    private (DiscChapterPresentation? Presentation, bool Definite) TryCreate(JsonElement source)
+    // The reason is shown on the overview for disc items left on original playback.
+    private (DiscChapterPresentation? Presentation, bool Definite, string? Reason) TryCreate(JsonElement source)
     {
         try
         {
-            return (presentationFactory is null ? DiscChapterPresentation.Create(source) : presentationFactory(source), true);
+            var presentation = presentationFactory is null ? DiscChapterPresentation.Create(source) : presentationFactory(source);
+            return (presentation, true, presentation is not null || !IsDisc(source) ? null : "Emby 尚无章节，可在「章节与截图」补全");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning("Infuse chapters: disc temporarily unreadable ({ErrorType}); forwarding original playback information.", e.GetType().Name);
-            return (null, false);
+            return (null, false, null);
         }
         // InvalidDataException carries "keep the original playback" decisions
         // (no matching title, ambiguous branches); it must not fail the request.
         catch (Exception e) when (e is ArgumentException or OverflowException or JsonException or IndexOutOfRangeException or InvalidDataException or KeyNotFoundException or InvalidOperationException)
         {
             logger.LogWarning("Infuse chapters: presentation unavailable ({ErrorType}); forwarding original playback information.", e.GetType().Name);
-            return (null, true);
+            return (null, true, e is InvalidDataException ? e.Message : "原盘导航无法解析（" + e.GetType().Name + "）");
         }
     }
 
@@ -261,7 +270,7 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         if (document.RootElement.TryGetProperty("Items", out var items)) foreach (var item in items.EnumerateArray())
             {
                 if (item.GetProperty("Id").GetString() != itemId || !item.TryGetProperty("MediaSources", out var sources)) continue;
-                foreach (var source in sources.EnumerateArray()) if (source.GetProperty("Id").GetString() == sourceId || sourceId.Length == 0 && sources.GetArrayLength() == 1) { presentation = Build(source); break; }
+                foreach (var source in sources.EnumerateArray()) if (source.GetProperty("Id").GetString() == sourceId || sourceId.Length == 0 && sources.GetArrayLength() == 1) { presentation = Build(source, SourceOf(item, source)); break; }
             }
         if (signature.Length == 0 && presentation is null) return false;
         if (presentation is null || signature.Length > 0 && !string.Equals(signature, presentation.Signature, StringComparison.Ordinal)) { context.Response.StatusCode = 409; return true; }

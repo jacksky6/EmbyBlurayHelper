@@ -11,7 +11,11 @@ namespace EmbyBlurayHelper.Proxy.Chapters;
 internal sealed class DiscListingStore(string? path, ILogger logger)
 {
     internal sealed record Listing(long Length, int ChapterCount, string Playlist, int MetadataBytes);
-    private sealed record Entry(Listing? Listing, DateTime Saved);
+    // Item, name and reason are display-only, for the overview; Reason is set
+    // only for disc items that keep the original playback.
+    internal sealed record Source(string ItemId, string Name, string SourceId, bool Disc);
+    private sealed record Entry(Listing? Listing, DateTime Saved, string? ItemId = null, string? Name = null, string? SourceId = null, string? Reason = null);
+    internal sealed record Unresolved(string ItemId, string Name, string Reason);
     private const int MaximumEntries = 50000;
     // Temporary read failures (unmounted volume, permissions) are retried after
     // this long, so a missing disk is not probed on every sync.
@@ -19,6 +23,8 @@ internal sealed class DiscListingStore(string? path, ILogger logger)
     private readonly object gate = new();
     private Dictionary<string, Entry>? entries;
     private readonly Dictionary<string, DateTime> deferred = new(StringComparer.Ordinal);
+    // Source id -> key used this session, so a superseded record is not reported.
+    private readonly Dictionary<string, string> current = new(StringComparer.Ordinal);
     private bool dirty;
 
     // Only the Emby fields that decide the virtual disc. Track languages, images
@@ -35,24 +41,55 @@ internal sealed class DiscListingStore(string? path, ILogger logger)
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())));
     }
 
-    internal bool TryGet(string key, out Listing? listing)
+    internal bool TryGet(string key, Source? source, out Listing? listing)
     {
         lock (gate)
         {
             Load();
-            if (entries!.TryGetValue(key, out var entry)) { listing = entry.Listing; return true; }
+            if (entries!.TryGetValue(key, out var entry))
+            {
+                listing = entry.Listing;
+                if (source is not null)
+                {
+                    current[source.SourceId] = key;
+                    // Records written before display fields existed gain them on the next sync.
+                    if (entry.SourceId is null) { entries[key] = entry with { ItemId = source.ItemId, Name = source.Name, SourceId = source.SourceId,
+                        Reason = entry.Listing is null && entry.Reason is null && source.Disc ? "升级前已判定，原因未记录；Emby 重新扫描或播放后更新" : entry.Reason }; dirty = true; }
+                }
+                return true;
+            }
             listing = null;
             return deferred.TryGetValue(key, out var until) && until > DateTime.UtcNow;
         }
     }
 
-    internal void Put(string key, Listing? listing)
+    internal void Put(string key, Listing? listing, Source? source = null, string? reason = null)
     {
         lock (gate)
         {
             Load(); deferred.Remove(key);
-            if (entries!.TryGetValue(key, out var old) && old.Listing == listing) return;
-            entries[key] = new(listing, DateTime.UtcNow); dirty = true;
+            if (source is not null) current[source.SourceId] = key;
+            if (entries!.TryGetValue(key, out var old) && old.Listing == listing && old.SourceId is not null) return;
+            entries[key] = new(listing, DateTime.UtcNow, source?.ItemId, source?.Name, source?.SourceId, listing is null ? reason : null); dirty = true;
+        }
+    }
+
+    // One row per disc source: the record in use this session, otherwise the
+    // most recently saved one. Items whose sources all keep the original
+    // playback are listed with the reason.
+    internal (int Available, IReadOnlyList<Unresolved> Unavailable) Summary()
+    {
+        lock (gate)
+        {
+            Load();
+            var all = entries!;
+            var latest = all.Where(e => e.Value.SourceId is not null).GroupBy(e => e.Value.SourceId!)
+                .Select(g => current.TryGetValue(g.Key, out var key) && all.TryGetValue(key, out var used) ? used : g.MaxBy(e => e.Value.Saved).Value).ToArray();
+            var available = latest.Where(e => e.Listing is not null).Select(e => e.ItemId).ToHashSet();
+            var unavailable = latest.Where(e => e.Listing is null && e.Reason is not null && !available.Contains(e.ItemId))
+                .GroupBy(e => e.ItemId).Select(g => g.First()).Select(e => new Unresolved(e.ItemId!, e.Name ?? e.ItemId!, e.Reason!))
+                .OrderBy(e => e.Name, StringComparer.CurrentCulture).Take(200).ToArray();
+            return (available.Count, unavailable);
         }
     }
 
