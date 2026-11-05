@@ -108,7 +108,7 @@ def build(version, published, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.2.0-21")
+    parser.add_argument("--version", default="0.2.0-22")
     parser.add_argument("--published", type=Path, default=ROOT / "artifacts/app/linux-x64")
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts/downloads")
     arguments = parser.parse_args()
