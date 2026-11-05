@@ -47,7 +47,7 @@ function fillSettings(result) {
   $('#enable-infuse').checked = configuration.enableInfuseLanguagePatch;
   $('#enable-multiclip').checked = !!configuration.enableInfuseMultiClipPlayback;
   $('#enable-infuse-chapters').checked = !!configuration.enableInfuseChapters;
-  $('#infuse-chapters-state').textContent = configuration.enableInfuseChapters ? '已启用 · 待客户端验证' : '已关闭';
+  $('#infuse-chapters-state').textContent = configuration.enableInfuseChapters ? '已启用' : '已关闭';
   $('#infuse-chapters-state').classList.toggle('off', !configuration.enableInfuseChapters);
   $('#enable-media-features').checked = !!configuration.enableMediaFeatures;
   $('#feature-probe-path').value = configuration.featureProbePath || '';
