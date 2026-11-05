@@ -8,7 +8,10 @@ namespace EmbyBlurayHelper.Proxy.Chapters;
 internal sealed class VirtualUdfImage
 {
     internal const int Sector = 2048;
-    internal const int FormatRevision = 2;
+    internal const int FormatRevision = 3;
+    // Authored discs do not expose transport packets near the image start. A
+    // player's generic container probe must not mistake this image for MPEG-TS.
+    internal const long MinimumMediaOffset = 32L * 1024 * 1024;
     private const uint Partition = 288;
     internal sealed record ImageFile(string Name, string? SourcePath, long Length, byte[]? Bytes = null);
     private sealed class Node(string name, Node? parent, ImageFile? file)
@@ -62,7 +65,9 @@ internal sealed class VirtualUdfImage
         var metadataBlocks = Align(cursor, 32);
         const uint metadataDataStart = 32;
         cursor = checked(metadataDataStart + metadataBlocks);
-        foreach (var node in nodes.Where(n => n.File is not null)) { node.Data = cursor; cursor = checked(cursor + Blocks(node.Length)); }
+        foreach (var node in nodes.Where(n => n.File?.Bytes is not null)) { node.Data = cursor; cursor = checked(cursor + Blocks(node.Length)); }
+        if (nodes.Any(n => n.File?.SourcePath is not null)) cursor = Math.Max(cursor, checked((uint)(MinimumMediaOffset / Sector) - Partition));
+        foreach (var node in nodes.Where(n => n.File?.SourcePath is not null)) { node.Data = cursor; cursor = checked(cursor + Blocks(node.Length)); }
         var mirrorEntry = Align(cursor, 32);
         var mirrorDataStart = checked(mirrorEntry + 32);
         var partitionBlocks = checked(mirrorDataStart + metadataBlocks);

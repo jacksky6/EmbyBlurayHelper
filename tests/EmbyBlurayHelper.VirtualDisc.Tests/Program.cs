@@ -18,6 +18,7 @@ if(args.Length>0 && args[0]!="--write-fixture")
     using var doc=JsonDocument.Parse(sourceJson);
     var p=DiscChapterPresentation.Create(doc.RootElement)??throw new Exception("No presentation.");
     using(var header=p.Image.Open())CheckUdf250(header);
+    Console.WriteLine(CheckMediaOffset(p.Image));
     using var stream=p.Image.Open();using var udf=new UdfReader(stream);
     var streams=udf.GetFiles(@"\BDMV\STREAM");
     Console.WriteLine(JsonSerializer.Serialize(new{Entries=udf.GetFileSystemEntries(@"\"),Bdmv=udf.GetFileSystemEntries(@"\BDMV"),Streams=streams,Known=udf.FileExists(@"\BDMV\STREAM\00294.m2ts")}));
@@ -26,6 +27,7 @@ if(args.Length>0 && args[0]!="--write-fixture")
     ChapterRoundTripCheck.Run(udf,doc.RootElement,p);
     Console.WriteLine(JsonSerializer.Serialize(new{p.Signature,p.Playlist,p.ChapterCount,p.Image.Length,p.Image.MetadataBytes}));
     if(args.Contains("--native"))await NativePreviewCheck.Run(p,Path.GetFullPath("../embyserver-win-x64-4.10.2.0/ffprobe.exe"));
+    if(args.Contains("--generic"))await GenericProbeCheck.Run(p,args.FirstOrDefault(a=>a.StartsWith("--ffprobe="))?["--ffprobe=".Length..]??Path.GetFullPath("../embyserver-win-x64-4.10.2.0/ffprobe.exe"));
     if(args.Contains("--remote"))await RemoteDiscCheck.Run(doc.RootElement,p,args.Length>1?args[1]:"12");
     return;
 }
@@ -57,6 +59,23 @@ using(var udf=new UdfReader(large))
 {
     if(udf.GetFileLength(@"\BDMV\STREAM\large.m2ts")!=5L*1024*1024*1024)throw new Exception("UDF 64-bit file length truncated.");
     Console.WriteLine("PASS: UDF file length and multiple allocation extents above 4 GiB.");
+}
+Console.WriteLine(CheckMediaOffset(VirtualUdfImage.Create([
+    new("BDMV/index.bdmv",null,bytes.Length,bytes),new("BDMV/STREAM/00294.m2ts","unused-unit-fixture",bytes.Length)])));
+
+static string CheckMediaOffset(VirtualUdfImage image)
+{
+    // Generic container probes read the image start; only UDF metadata may be there.
+    var first=image.Regions.Where(r=>!r.Metadata).Select(r=>r.Offset).DefaultIfEmpty(image.Length).Min();
+    if(first<VirtualUdfImage.MinimumMediaOffset)throw new Exception($"Original media starts at {first}, inside the generic probe window.");
+    var head=new byte[VirtualUdfImage.MinimumMediaOffset];
+    using(var stream=image.Open())stream.ReadExactly(head);
+    for(var o=0;o+4+192*19<head.Length;o++)
+    {
+        var run=true;for(var k=0;k<20&&run;k++)run=head[o+4+192*k]==0x47;
+        if(run)throw new Exception($"Image start contains an M2TS packet run at {o}.");
+    }
+    return $"PASS: original media starts at {first}; no M2TS packet run in the first {VirtualUdfImage.MinimumMediaOffset} bytes.";
 }
 
 static void CheckUdf250(Stream stream)
