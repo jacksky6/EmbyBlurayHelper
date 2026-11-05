@@ -35,7 +35,7 @@
     const pending = chosen().filter(i => again || !i.verified).length;
     $('#feature-batch-scan').disabled = locked;
     $('#feature-batch-fill').disabled = locked || !task?.canFill || !pending || !mediaFeatureReady;
-    $('#feature-batch-fill').textContent = `${task?.operation === 'fill' && !active ? '继续补充所选' : '补充所选媒体库'}${pending ? `（${pending} 部）` : ''}`;
+    $('#feature-batch-fill').textContent = `${task?.operation === 'fill' && !active ? '继续补全所选' : '补全所选媒体库'}${pending ? `（${pending} 部）` : ''}`;
     $('#feature-batch-cancel').hidden = !active;
     $('#feature-batch-cancel').disabled = changing || task?.status === 'cancelling';
     $('#feature-batch-refresh').disabled = changing;
@@ -54,9 +54,9 @@
     $('#feature-batch-completed-count').textContent = task?.operation === 'fill' ? task.completed : '—';
     $('#feature-batch-failures').textContent = task?.operation === 'fill' ? `失败 ${task.failed} · 跳过 ${task.skipped}` : '逐源探测并读回确认';
     $('#feature-batch-prerequisite').textContent = task?.id && !task.connectionMatches ? '连接、引擎或配置已变更，请重新检查媒体库。'
-      : !mediaFeatureReady ? '检查只读取 Emby 信息；实际补充前请开启上方规格识别并确认接入。'
+      : !mediaFeatureReady ? '检查只读取 Emby 信息；实际补全前请开启上方规格识别并确认接入。'
       : '默认只核验未完成的 BDMV / ISO；需要重新处理时可勾选「重新核验已完成」。';
-    const states = { idle:'尚未检查', scanning:'正在检查媒体库', ready:'检查完成', filling:'正在补充规格', cancelling:'正在停止任务', cancelled:'任务已停止', interrupted:'上次任务中断', completed:'规格任务结束', failed:'任务未完成' };
+    const states = { idle:'尚未检查', scanning:'正在检查媒体库', ready:'检查完成', filling:'正在补全规格', cancelling:'正在停止任务', cancelled:'任务已停止', interrupted:'上次任务中断', completed:'规格任务结束', failed:'任务未完成' };
     $('#feature-batch-title').textContent = states[task?.status] || states.idle;
     $('#feature-batch-progress').dataset.state = task?.status || 'idle';
     const total = task?.operation === 'fill' ? task.planned : groups.length;
@@ -65,7 +65,7 @@
     if (active && !total) bar.removeAttribute('value'); else { bar.max = Math.max(1, total); bar.value = Math.min(done, total); }
     $('#feature-batch-percent').textContent = total ? `${done} / ${total}${task?.operation === 'fill' ? ' 部' : ' 个媒体库'}` : '';
     const current = task?.items.find(i => i.id === task.currentItemId);
-    $('#feature-batch-message').textContent = (task?.message || '先检查媒体库，再选择需要补充规格的原盘。') +
+    $('#feature-batch-message').textContent = (task?.message || '先检查媒体库，再选择需要补全规格的原盘。') +
       (active && current?.message ? ` ${current.message}` : '');
     $('#feature-batch-counts').textContent = task?.operation === 'fill' ? `成功 ${task.completed} · 失败 ${task.failed} · 跳过 ${task.skipped}` : '任务运行且此页面可见时刷新进度';
     const at = task?.finishedAt || task?.startedAt;

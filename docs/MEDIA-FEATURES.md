@@ -5,7 +5,7 @@
 ## 使用
 
 1. 使用包含本功能的 Helper，以及 `EmbyBlurayHelper.Plugin.dll` 0.1.4 或更新版本。安装或更新 DLL 后重启 Emby；批量核验需要此版本提供的增强探测凭据检查。
-2. 在「Emby 连接」保留 **Emby 原版 ffprobe** 的路径。
+2. 在「连接与账号」保留 **Emby 原版 ffprobe** 的路径。
 3. 打开左侧一级菜单「音视频规格」，填写 **独立增强 ffprobe** 路径。它必须是另一份支持 Atmos / Dolby Vision 元数据的现代 ffprobe，不能填写原版路径或 Helper 自身。
 4. 点击「检查增强 ffprobe」，开启规格识别。页面会读取实际插件开关、探测器接入状态和文件可访问性。
 5. 如需 Emby 音轨名称直接显示 Atmos，勾选「Emby 显示原始轨道标题」并保存。这是 Emby 原生的全局选项，也会让其他影片使用其原有的音轨、视频和字幕标题。

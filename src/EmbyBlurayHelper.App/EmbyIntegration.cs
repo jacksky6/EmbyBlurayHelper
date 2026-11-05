@@ -84,13 +84,13 @@ internal sealed class EmbyIntegration(SettingsStore settings, HttpClient client,
             probeEnabled = options?["UseCustomProbePath"]?.GetValue<bool>(), probePath = options?["CustomProbePath"]?.ToString(),
             apiAuthenticated = options is not null, backupAvailable = File.Exists(BackupPath),
             originalProbePath = OriginalProbe(options), originalProbeAccessible = ProbeAccessible(OriginalProbe(options)),
-            integration = options is null ? UnknownStatus("请在「Emby 连接」中保存 API key，才能读取实际接入状态。") : DescribeProbe(options) };
+            integration = options is null ? UnknownStatus("请在「连接与账号」中保存 API key，才能读取实际接入状态。") : DescribeProbe(options) };
     }
 
     public async Task<ProbeStatus> GetProbeStatus(CancellationToken token)
     {
         if (settings.Current.EmbyApiKey.Length == 0)
-            return UnknownStatus("请在「Emby 连接」中保存 API key，才能读取实际接入状态。");
+            return UnknownStatus("请在「连接与账号」中保存 API key，才能读取实际接入状态。");
         try { return DescribeProbe(await Options(token)); }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (HttpRequestException e)
@@ -154,7 +154,7 @@ internal sealed class EmbyIntegration(SettingsStore settings, HttpClient client,
         await probeChange.WaitAsync(token);
         try
         {
-            if (settings.Current.EmbyApiKey.Length == 0) throw new ArgumentException("请先在「Emby 连接」中保存 API key。");
+            if (settings.Current.EmbyApiKey.Length == 0) throw new ArgumentException("请先在「连接与账号」中保存 API key。");
             var options = await Options(token);
             var status = DescribeProbe(options);
             if (status.State == "unknown") throw new InvalidOperationException(status.Message);

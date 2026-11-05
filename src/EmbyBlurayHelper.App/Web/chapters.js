@@ -10,8 +10,9 @@
     const active = !!task?.active, locked = busy || active, groups = task?.libraries || [];
     $('#chapter-enabled').disabled = busy;
     if (!busy) $('#chapter-enabled').checked = !!status?.enabled;
+    $('#chapter-status').dataset.state = busy || !status?.ready || status?.enabled !== status?.automatic ? 'warn' : status?.enabled ? 'on' : 'off';
     $('#chapter-status-title').textContent = busy ? '正在保存' : !status?.ready ? '等待安装或连接' : status?.enabled && status?.automatic ? '已开启 · 新片自动补全' : status?.enabled !== status?.automatic ? '配置状态不一致' : '已关闭';
-    $('#chapter-status-copy').textContent = status?.error || (status?.enabled !== status?.automatic ? '工具与 Emby 插件开关不同步，请重新保存章节设置。' : status?.automatic ? `已确认插件接入 · ${status.checkedItems} 个原盘媒体源已保存。` : '开启后处理新入库原盘；已有影片请在下方选择媒体库。');
+    $('#chapter-status-copy').textContent = status?.error || (status?.enabled !== status?.automatic ? '工具与 Emby 插件开关不同步，请关闭再打开上方开关。' : status?.automatic ? `已确认插件接入 · ${status.checkedItems} 个原盘媒体源已保存。` : '开启后处理新入库原盘；已有影片请在下方选择媒体库。');
     $('#chapter-save').disabled = busy;
     const thumbnails = status?.thumbnails, worker = thumbnails?.worker;
     $('#chapter-thumbnail-state').textContent = !thumbnails?.available ? '截图接入尚未确认。需要插件 0.1.6 和新版 Helper；更新后刷新状态。' : worker?.state === 'Running' ? `Emby 原盘截图任务运行中 · ${Math.round(worker.progress || 0)}%` : worker?.lastStatus === 'Failed' ? `上次截图任务失败：${worker.error || '请查看 Emby 的 DiscThumbnails 日志，可重跑任务补齐缺失图片。'}` : worker?.lastStatus?.startsWith('Cancel') ? '原盘截图任务已停止 · 已完成图片保留，可重跑任务补齐缺失图片。' : '已接入 Emby 截图设置 · ' + (worker?.lastStatus === 'Completed' ? '上次原盘截图任务已完成。' : '等待 Emby 扫描或提取任务触发。');
@@ -78,6 +79,7 @@
   }
   $('#chapter-enabled').onchange = configure; $('#chapter-save').onclick = configure;
   $('#chapter-refresh').onclick = () => refresh().catch(error => toast(error.message, true));
+  $('#chapter-progress-refresh').onclick = () => refresh(false).catch(error => toast(error.message, true));
   $('#chapter-scan').onclick = () => change('scan'); $('#chapter-fill').onclick = () => change('fill'); $('#chapter-cancel').onclick = () => change('cancel');
   $('#chapter-select-all').onchange = e => { selected = new Set(e.target.checked ? (task?.libraries || []).map(l => l.id) : []); page = 0; render(); };
   $('#chapter-groups').onchange = e => { const id = e.target.dataset.chapterLibrary; if (!id) return; e.target.checked ? selected.add(id) : selected.delete(id); page = 0; render(); };

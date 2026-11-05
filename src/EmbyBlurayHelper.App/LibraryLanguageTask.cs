@@ -140,7 +140,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
             var config = Config();
             if (plan.Id != planId || !plan.ScanComplete) throw new InvalidOperationException("检查计划已变化或尚未完成，请重新检查媒体库。");
             if (plan.ConnectionFingerprint != Fingerprint(config)) throw new InvalidOperationException("Emby 连接已变更，请重新检查媒体库。");
-            if (!config.EnableProbeLanguagePatch) throw new InvalidOperationException("请先开启「Emby 探测语言补全」并确认已接入。");
+            if (!config.EnableProbeLanguagePatch) throw new InvalidOperationException("请先在「语言与时长」开启「Emby 探测语言补全」并确认已接入。");
             var selected = (libraryIds ?? plan.Libraries.Select(l => l.Id).ToArray()).Distinct(StringComparer.Ordinal).ToArray();
             if (selected.Length == 0) throw new InvalidOperationException("请至少选择一个媒体库。");
             if (selected.Any(id => !plan.Libraries.Any(l => l.Id == id))) throw new InvalidOperationException("所选媒体库不在检查计划中，请重新检查媒体库。");
@@ -331,7 +331,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         var options = await Read(config, "Encoding/FfmpegOptions", token);
         if (options.TryGetProperty("Object", out var value)) options = value;
         if (!Flag(options, "UseCustomProbePath") || !ProbeSettings.IsOurPath(Text(options, "CustomProbePath")))
-            throw new InvalidOperationException("Emby 尚未接入本工具的探测器。请先开启「Emby 探测语言补全」并确认已接入，再运行补全。");
+            throw new InvalidOperationException("Emby 尚未接入本工具的探测器。请先在「语言与时长」开启「Emby 探测语言补全」并确认已接入，再运行补全。");
     }
 
     public Task<IsoPrerequisiteStatus> CheckIsoPrerequisites(CancellationToken token) => isoPrerequisites.Check(settings.Current, token);

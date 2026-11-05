@@ -9,8 +9,11 @@ let multiClipStatus = null, multiClipChanging = false, multiClipRevision = 0;
 let libraryTask = null, libraryTimer, libraryRequest, libraryRevision = 0, libraryChanging = false, libraryPage = 0;
 let librarySelectionPlan = '', librarySelectionInitialized = false, selectedLibraryIds = new Set();
 let isoStatus = null, isoLoading = false, isoRequest = null, isoRevision = 0;
-const labels = { overview:'概览', connection:'Emby 连接', language:'Emby 探测语言补全', 'media-features':'音视频规格', chapters:'原盘章节', infuse:'Infuse 播放', diagnostics:'原盘检查', logs:'运行日志' };
+const labels = { overview:'概览', language:'语言与时长', 'media-features':'音视频规格', chapters:'章节与截图', infuse:'播放增强', diagnostics:'单片检查', logs:'运行日志', connection:'连接与账号' };
+const groups = { overview:'工作空间', language:'Emby 媒体库', 'media-features':'Emby 媒体库', chapters:'Emby 媒体库', infuse:'Infuse 播放', diagnostics:'工具', logs:'工具', connection:'设置' };
 let mediaFeatureBusy = false, mediaFeatureReady = false;
+// Overview-only snapshots; each page keeps its own live state.
+let overview = {}, overviewRequest = null, infuseChapters = null;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(message, failed = false) { const el = $('#toast'); el.textContent = message; el.classList.toggle('failed', failed); el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 5000); }
 async function api(path, body) {
@@ -28,10 +31,12 @@ function navigate(page) {
   $$('.page').forEach(el => el.hidden = el.id !== 'page-' + page);
   $$('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   $('#page-breadcrumb').textContent = labels[page];
+  $('#page-group').textContent = groups[page];
   document.title = labels[page] + ' · EmbyBlurayHelper';
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
   if (configuration && !$('#console').hidden && ['overview','language'].includes(page)) refreshProbeStatus().catch(() => {});
-  if (configuration && !$('#console').hidden && ['overview','infuse'].includes(page)) refreshMultiClipStatus().catch(() => {});
+  if (configuration && !$('#console').hidden && ['overview','infuse'].includes(page)) { refreshMultiClipStatus().catch(() => {}); refreshInfuseChapters().catch(() => {}); }
+  if (configuration && !$('#console').hidden && page === 'overview') loadOverview().catch(() => {});
   clearTimeout(libraryTimer);
   if (configuration && !$('#console').hidden && page === 'language') { refreshLibraryTask().catch(() => {}); refreshIsoStatus().catch(() => {}); }
   if (configuration && !$('#console').hidden && page === 'media-features') refreshMediaFeatures().catch(error => toast(error.message,true));
@@ -46,9 +51,6 @@ function fillSettings(result) {
   $('#enable-probe').checked = configuration.enableProbeLanguagePatch;
   $('#enable-infuse').checked = configuration.enableInfuseLanguagePatch;
   $('#enable-multiclip').checked = !!configuration.enableInfuseMultiClipPlayback;
-  $('#enable-infuse-chapters').checked = !!configuration.enableInfuseChapters;
-  $('#infuse-chapters-state').textContent = configuration.enableInfuseChapters ? '已启用' : '已关闭';
-  $('#infuse-chapters-state').classList.toggle('off', !configuration.enableInfuseChapters);
   $('#enable-media-features').checked = !!configuration.enableMediaFeatures;
   $('#feature-probe-path').value = configuration.featureProbePath || '';
   $('#api-key').value = configuration.embyApiKey;
@@ -59,18 +61,76 @@ function fillSettings(result) {
   featureState();
 }
 function featureState() {
-  const el = $('#infuse-state'); el.textContent = configuration.enableInfuseLanguagePatch ? '已启用' : '已关闭'; el.classList.toggle('off', !configuration.enableInfuseLanguagePatch);
+  renderToggles();
   renderProbeStatus();
   renderMultiClipStatus();
+}
+function setStatus(box, state, title, copy) {
+  box.dataset.state = state;
+  box.querySelector('strong').textContent = title;
+  if (copy !== undefined) box.querySelector('p').textContent = copy;
+}
+function tag(el, text, on) { el.textContent = text; el.classList.toggle('off', !on); }
+// Switches that are plain settings: show the saved value, never unsaved input.
+function renderToggles() {
+  if (!configuration) return;
+  const language = !!configuration.enableInfuseLanguagePatch, chapters = !!configuration.enableInfuseChapters;
+  // While a save is in flight, keep what the user just clicked.
+  if (!settingsSaving) { $('#enable-infuse').checked = language; $('#enable-infuse-chapters').checked = chapters; }
+  for (const toggle of [$('#enable-infuse'),$('#enable-infuse-chapters')]) toggle.disabled = settingsSaving;
+  setStatus($('#infuse-language-status'), language ? 'on' : 'off', language ? '已启用' : '已关闭',
+    language ? 'Infuse 静态播放 UHD 原盘时，按原盘语言补写缺失的音轨和字幕标签。' : '开启后，Infuse 播放 UHD 原盘时按原盘语言补写音轨和字幕标签。');
+  tag($('#infuse-state'), language ? '已启用' : '已关闭', language);
+  const unavailable = infuseChapters?.unavailable || [];
+  setStatus($('#infuse-chapters-status'), chapters ? 'on' : 'off', chapters ? '已启用' : '已关闭',
+    !chapters ? '默认关闭。开启后，带 Emby 章节的 BDMV 在 Infuse 中以虚拟 ISO 呈现。'
+    : !infuseChapters ? '正在读取 Infuse 已同步的原盘记录。'
+    : `${infuseChapters.available} 部原盘以虚拟 ISO 提供章节${unavailable.length ? ` · ${unavailable.length} 部保留原播放方式` : ''}。数字来自 Infuse 已同步过的媒体库。`);
+  $('#infuse-chapters-state').classList.toggle('off', !chapters);
+  tag($('#infuse-chapters-tag'), chapters ? '已启用' : '已关闭', chapters);
+  $('#chapter-infuse-link').textContent = chapters ? '当前已启用' : '当前已关闭';
+  $('#infuse-proxy-address').textContent = proxyAddress();
+  $('#infuse-chapters-unavailable').hidden = !chapters || !unavailable.length;
+  $('#infuse-chapters-unavailable-count').textContent = unavailable.length ? unavailable.length + ' 部' : '';
+  $('#infuse-chapters-unavailable-rows').innerHTML = unavailable.map(u => `<tr><td><strong>${escapeHtml(u.name)}</strong><small>ID ${escapeHtml(u.itemId)}</small></td><td>${escapeHtml(u.reason)}</td></tr>`).join('');
+  if (!$('#page-overview').hidden) renderOverview();
+}
+async function refreshInfuseChapters() { infuseChapters = await api('infuse/chapters'); renderToggles(); }
+// Save one card's fields over the latest saved settings, so unsaved input
+// elsewhere on the page is neither saved nor overwritten.
+async function saveSetting(patch) {
+  settingsSaving = true; renderToggles(); renderProbeStatus(); renderMultiClipStatus();
+  try {
+    const latest = await api('settings');
+    await api('settings', { ...latest.settings, ...patch });
+    const saved = await api('settings');
+    configuration = saved.settings;
+    $('#restart-banner').hidden = !saved.restartRequired;
+    return saved;
+  } finally { settingsSaving = false; featureState(); }
+}
+function showSaved(fields) {
+  const map = { 'emby-url':'embyUrl', 'api-key':'embyApiKey', 'probe-path':'upstreamProbePath', 'proxy-url':'proxyUrl', 'management-url':'managementUrl' };
+  for (const id of fields) $('#' + id).value = configuration[map[id]];
+}
+async function saveServer() {
+  await saveSetting({ embyUrl:$('#emby-url').value.trim().replace(/\/$/,''), embyApiKey:$('#api-key').value.trim(), upstreamProbePath:$('#probe-path').value.trim() });
+  showSaved(['emby-url','api-key','probe-path']);
+  probeRevision++; probeStatus = null; isoRevision++; isoStatus = null; isoRequest = null;
+  await Promise.all([refreshProbeStatus(true),refreshMultiClipStatus(),refreshIsoStatus()]);
+}
+async function toggleSetting(input, key, onText, offText) {
+  const enabled = input.checked;
+  try { await saveSetting({ [key]: enabled }); toast(enabled ? onText : offText); }
+  catch (error) { input.checked = !enabled; toast(error.message, true); }
 }
 function renderMultiClipStatus() {
   const enabled = multiClipStatus?.enabled ?? !!configuration?.enableInfuseMultiClipPlayback;
   const state = multiClipChanging ? 'changing' : !enabled ? 'off' : multiClipStatus?.readerAvailable ? 'on' : 'pending';
   const title = ({changing:'正在保存',off:'已关闭',on:'已开启 · 按需处理',pending:'已开启 · 等待配置'})[state];
   $('#multiclip-state').textContent = title; $('#multiclip-state').classList.toggle('off',state !== 'on');
-  $('#multiclip-status').dataset.state = state;
-  $('#multiclip-status-title').textContent = title;
-  $('#multiclip-status-copy').textContent = multiClipChanging ? '正在保存独立开关，稍后生效。' : multiClipStatus?.message || '新功能默认关闭，可与语言补写分别开启或关闭。';
+  setStatus($('#multiclip-status'), ({changing:'warn',off:'off',on:'on',pending:'warn'})[state], title,
+    multiClipChanging ? '正在保存开关，稍后生效。' : multiClipStatus?.message || '默认关闭，可与语言补写分别开启或关闭。');
   const toggle = $('#enable-multiclip'); if (!multiClipChanging) toggle.checked = enabled;
   toggle.disabled = multiClipChanging || settingsSaving || probeChanging;
 }
@@ -121,11 +181,11 @@ function renderProbeStatus() {
   if (!probeChanging) toggle.checked = probeStatus?.state === 'connected' && !!enabled;
   toggle.disabled = probeLoading || probeChanging || settingsSaving || !probeStatus || probeStatus.state === 'unknown' ||
     (probeStatus.state === 'connected' && enabled ? !probeStatus.canRestore : probeStatus.state !== 'connected' && !probeStatus.canApply);
-  for (const button of [$('#save-features'),$('#save-infuse-settings'),$('#test-emby'),$('#check-probe'),$('#discover-probe')]) button.disabled = probeChanging || settingsSaving || multiClipChanging || button.dataset.busy === '1';
+  for (const button of [$('#test-emby'),$('#check-probe'),$('#discover-probe'),$('#save-addresses')]) button.disabled = probeChanging || settingsSaving || multiClipChanging || button.dataset.busy === '1';
   $('#enable-probe').disabled ||= multiClipChanging;
   $('#enable-multiclip').disabled = multiClipChanging || settingsSaving || probeChanging;
-  $('#probe-switch-help').textContent = '此开关立即生效并自动保存，无需点击「保存设置」。关闭会恢复原探测器配置，不会清理媒体库。';
   renderLibraryTask();
+  if (!$('#page-overview').hidden) renderOverview();
 }
 async function refreshProbeStatus(force = false) {
   if (!force && probeRequest) return probeRequest;
@@ -139,10 +199,6 @@ async function refreshProbeStatus(force = false) {
   probeRequest = request;
   return request;
 }
-function collectSettings() {
-  return { ...configuration, embyUrl:$('#emby-url').value.trim().replace(/\/$/,''), proxyUrl:$('#proxy-url').value.trim().replace(/\/$/,''), managementUrl:$('#management-url').value.trim().replace(/\/$/,''), upstreamProbePath:$('#probe-path').value.trim(), embyApiKey:$('#api-key').value.trim(), enableInfuseLanguagePatch:$('#enable-infuse').checked, enableInfuseChapters:$('#enable-infuse-chapters').checked };
-}
-async function save() { settingsSaving = true; renderProbeStatus(); renderMultiClipStatus(); try { await api('settings', collectSettings()); probeRevision++; probeStatus = null; isoRevision++; isoStatus = null; isoRequest = null; fillSettings(await api('settings')); await Promise.all([refreshProbeStatus(true),refreshMultiClipStatus(),refreshIsoStatus()]); } finally { settingsSaving = false; renderProbeStatus(); renderMultiClipStatus(); } }
 async function setProbeEnabled(enabled) {
   if (probeChanging) return;
   probeChanging = true; renderProbeStatus();
@@ -160,19 +216,88 @@ function renderLogs() {
   $('#log-rows').innerHTML = rows.map(e => `<tr><td>${new Date(e.time).toLocaleTimeString('zh-CN',{hour12:false})}</td><td><span class="level ${escapeHtml(e.level)}">${({Information:'信息',Warning:'警告',Error:'错误'})[e.level] || escapeHtml(e.level)}</span></td><td>${escapeHtml(e.source)}</td><td>${escapeHtml(e.message)}</td></tr>`).join('');
   $('#logs-empty').hidden = rows.length !== 0;
   $('#log-count').textContent = rows.length + ' 条记录';
-  $('#recent-activity').innerHTML = [...logEntries].reverse().slice(0,3).map(e => `<div class="activity-row"><span class="event-mark"><svg><use href="#${e.level === 'Information' ? 'check' : 'activity'}"/></svg></span><span class="event-message" title="${escapeHtml(e.message)}">${escapeHtml(e.message)}</span><time>${new Date(e.time).toLocaleTimeString('zh-CN',{hour12:false})}</time></div>`).join('') || '<p class="empty">暂无活动</p>';
+  // Overview shows outcomes, not per-request proxy traces or host startup lines.
+  const meaningful = e => e.level !== 'Information' || ['LibraryLanguage','MediaFeatureBatch','MediaFeatures','NativeChapters','Probe','MultiClip','Settings','Account'].includes(e.source);
+  $('#recent-activity').innerHTML = [...logEntries].reverse().filter(meaningful).slice(0,5).map(e => `<div class="activity-row"><span class="event-mark"><svg><use href="#${e.level === 'Information' ? 'check' : 'activity'}"/></svg></span><span class="event-message" title="${escapeHtml(e.message)}">${escapeHtml(e.message)}</span><time>${new Date(e.time).toLocaleTimeString('zh-CN',{hour12:false})}</time></div>`).join('') || '<p class="empty">暂无活动</p>';
 }
 async function refresh() {
   const revision = logRevision;
   const [status,logs] = await Promise.all([api('status'),api('logs')]);
   $('#stat-requests').textContent = status.requests.toLocaleString(); $('#stat-active').textContent = status.active;
   $('#stat-patched').textContent = status.patchedTables.toLocaleString();
-  const [number,unit] = size(status.patchedBytes); $('#stat-bytes').innerHTML = `${number} <small>${unit}</small>`;
-  $('#stat-memory').innerHTML = `${status.memoryMiB} <small>MB</small>`;
+  const [number,unit] = size(status.patchedBytes); $('#stat-bytes').textContent = `${number} ${unit}`;
+  $('#stat-memory').textContent = `${status.memoryMiB} MB`;
   const minutes = Math.max(0,Math.floor((Date.now() - new Date(status.started))/60000));
   $('#stat-uptime').textContent = minutes < 60 ? `已运行 ${minutes} 分钟` : `已运行 ${Math.floor(minutes/60)} 小时 ${minutes%60} 分钟`;
   $('#platform').textContent = status.os + ' · ' + status.architecture;
   if (!logsClearing && revision === logRevision) { logEntries = logs; renderLogs(); }
+}
+// Read-only snapshots from each page's last check; nothing here scans media.
+async function loadOverview() {
+  if (overviewRequest) return overviewRequest;
+  const get = path => api(path).catch(error => ({ error: error.message }));
+  overviewRequest = (async () => {
+    try {
+      const [language, features, featureBatch, chapters, chapterBatch, iso] = await Promise.all(['library-language','media-features','media-features/batch','chapters','chapters/batch','iso/status'].map(get));
+      overview = { loaded:true, language, features, featureBatch, chapters, chapterBatch, iso };
+      renderOverview();
+    } finally { overviewRequest = null; }
+  })();
+  return overviewRequest;
+}
+function proxyAddress() {
+  let port = '8097'; try { port = new URL(configuration.proxyUrl).port || '80'; } catch {}
+  const host = ['localhost','127.0.0.1','::1','[::1]'].includes(location.hostname) ? '本机 IP' : location.hostname;
+  return `http://${host}:${port}`;
+}
+function renderOverview() {
+  if (!configuration) return;
+  const { language, features, featureBatch, chapters, chapterBatch, iso } = overview;
+  const probe = probeStatus?.state, plugin = iso?.pluginState;
+  const needsSetup = !configuration.embyApiKey || probe === 'unknown';
+  $('#setup-notice').hidden = !needsSetup;
+  const hero = $('#hero-action'); hero.dataset.goto = needsSetup ? 'connection' : 'language'; hero.firstChild.textContent = needsSetup ? '连接 Emby ' : '查看媒体库 ';
+  const dot = (id, state) => $('#' + id).className = 'status-dot' + (state === 'on' ? '' : state === 'warn' ? ' failed' : ' neutral');
+  const emby = !configuration.embyApiKey ? '未配置' : !probe ? '读取中' : probe === 'unknown' ? '需要检查' : '已连接';
+  $('#int-emby').textContent = emby; dot('int-emby-dot', emby === '已连接' ? 'on' : emby === '读取中' ? 'off' : 'warn');
+  $('#int-probe').textContent = ({connected: probeStatus?.languagePatchEnabled ? '已接入 · 语言补全已启用' : '已接入 · 语言补全已暂停', disconnected:'未接入 · 使用原探测器', other:'其他自定义探测器', unknown:'无法确认'})[probe] || '读取中';
+  dot('int-probe-dot', probe === 'connected' ? 'on' : ['unknown','other'].includes(probe) ? 'warn' : 'off');
+  $('#int-plugin').textContent = (!iso ? '读取中' : ({ready:'已加载','not-loaded':'未加载',outdated:'版本过旧'})[plugin] || '无法确认') + (iso?.pluginVersion ? ' · ' + iso.pluginVersion : '');
+  dot('int-plugin-dot', plugin === 'ready' ? 'on' : !iso ? 'off' : 'warn');
+  $('#int-proxy').textContent = proxyAddress(); dot('int-proxy-dot','on');
+  const s = language?.summary, checked = !!s && (!!language.checkedAt || language.moviesChecked > 0);
+  const pendingLanguage = checked ? s.missingMovies + s.unknownMovies : 0;
+  $('#ov-discs').textContent = checked ? s.blurayMovies : '—';
+  $('#ov-discs-foot').textContent = checked ? `${language.moviesChecked} 部电影 · ${s.uhdMovies} 部 UHD` : '尚未检查媒体库';
+  $('#ov-language').textContent = checked ? `${s.completeMovies} / ${s.blurayMovies}` : '—';
+  $('#ov-language-foot').textContent = checked ? (pendingLanguage ? `${pendingLanguage} 部待补全` : '全部完整') : '在「语言与时长」检查媒体库';
+  const c = chapterBatch?.id ? chapterBatch.summary : null, f = featureBatch?.id ? featureBatch.summary : null;
+  $('#ov-chapters').textContent = c ? `${c.verified + c.preserved} / ${c.discs}` : '—';
+  $('#ov-chapters-foot').textContent = c ? (c.pending ? `${c.pending} 部待补全` : '全部已有章节') : '在「章节与截图」检查媒体库';
+  $('#ov-features').textContent = f ? `${f.verified} / ${f.discs}` : '—';
+  $('#ov-features-foot').textContent = f ? (f.pending ? `${f.pending} 部待核验` : '全部已核验') : '在「音视频规格」检查媒体库';
+  const featureOn = !!features && !features.error && features.enabled && features.automatic === true && features.probeAccessible && features.probeConnected;
+  tag($('#features-state'), !features || features.error ? '无法确认' : featureOn ? '已启用 · 自动识别' : features.enabled ? '需要检查' : '已关闭', featureOn);
+  const chapterOn = !!chapters && !chapters.error && chapters.ready && chapters.enabled && chapters.automatic;
+  tag($('#chapters-state'), !chapters || chapters.error ? '无法确认' : chapterOn ? '已启用 · 自动补全' : !chapters.ready ? '等待插件' : chapters.enabled !== chapters.automatic ? '需要检查' : '已关闭', chapterOn);
+  const thumbs = chapters?.thumbnails;
+  tag($('#thumbnails-state'), !thumbs ? '无法确认' : !thumbs.available ? '等待插件 0.1.6' : thumbs.worker?.state === 'Running' ? '截图任务运行中' : '跟随 Emby 设置', !!thumbs?.available);
+  const items = [], add = (level, text, page) => items.push({ level, text, page });
+  if (!configuration.embyApiKey) add('warn','尚未保存 Emby API key，大部分功能无法使用。','connection');
+  else if (probe === 'unknown') add('warn', probeStatus?.message || '无法读取 Emby 状态，请检查连接。','connection');
+  if (configuration.enableMediaFeatures && probe && probe !== 'connected' && probe !== 'unknown') add('warn','「音视频规格」识别已开启，但 Emby 探测器未接入，新片不会自动识别。','language');
+  if (['not-loaded','outdated'].includes(plugin)) add('warn',`Emby 插件${plugin === 'outdated' ? '版本过旧' : '未加载'}：ISO 补全、原盘章节和截图不可用。安装随包 DLL 并重启 Emby。`,'chapters');
+  if (chapters && !chapters.error && chapters.ready && chapters.enabled !== chapters.automatic) add('warn','原盘章节开关与 Emby 插件不同步，请在「章节与截图」重新开关一次。','chapters');
+  for (const [task, name, page] of [[language,'语言与时长','language'],[chapterBatch,'章节','chapters'],[featureBatch,'规格','media-features']])
+    if (['failed','interrupted'].includes(task?.status)) add('warn',`上次${name}任务未完成，可在对应页面继续。`, page);
+  if (pendingLanguage) add('info',`${pendingLanguage} 部原盘的语言或时长待补全。`,'language');
+  if (c?.pending) add('info',`${c.pending} 部原盘的章节待补全。`,'chapters');
+  if (f?.pending) add('info',`${f.pending} 部原盘的规格待核验。`,'media-features');
+  const unavailable = infuseChapters?.unavailable || [];
+  if (configuration.enableInfuseChapters && unavailable.length) add('info',`${unavailable.length} 部原盘在 Infuse 中保留原播放方式（${unavailable.slice(0,2).map(u => u.name).join('、')}${unavailable.length > 2 ? ' 等' : ''}）。`,'infuse');
+  $('#attention-list').innerHTML = !overview.loaded ? '<p class="empty">正在读取状态</p>'
+    : items.map(i => `<div class="attention-row ${i.level}"><span class="event-mark"><svg><use href="#${i.level === 'warn' ? 'alert' : 'activity'}"/></svg></span><span>${escapeHtml(i.text)}</span><button class="text-button accent" data-attention="${i.page}">${escapeHtml(labels[i.page])} →</button></div>`).join('')
+      || '<p class="empty">暂无需要处理的事项</p>';
 }
 async function testEmby() {
   try { const result = await api('emby/test',{});
@@ -200,17 +325,21 @@ window.addEventListener('hashchange',()=>navigate(location.hash.slice(1)));
 $$('[data-level]').forEach(el => el.onclick = () => { logLevel=el.dataset.level; $$('[data-level]').forEach(b=>b.classList.toggle('selected',b===el)); renderLogs(); });
 action('#logout',async()=>{await api('logout',{});showLogin();});
 action('#clear-logs',async()=>{if(!await confirm('清除全部运行日志？','将删除本工具保存的全部运行日志，包括历史日志和当前页面中的记录，清除后无法恢复。配置和运行统计保持不变。','清除全部'))return;logsClearing=true;logRevision++;try{const result=await api('logs/clear',{});logEntries=[];renderLogs();toast(result.message);}finally{logsClearing=false;logRevision++;}});
-const saveSettings = async()=>{await save();toast('设置已保存'+($('#restart-banner').hidden ? '，功能开关已生效。' : '，端口变更将在重启后生效。'));};
-action('#save-features',saveSettings);
-action('#save-infuse-settings',saveSettings);
-action('#refresh-status',async()=>{await Promise.all([refresh(),refreshProbeStatus(true)]);await testEmby();toast('状态已更新。');});
+action('#refresh-status',async()=>{await Promise.all([refresh(),refreshProbeStatus(true),refreshMultiClipStatus(),refreshInfuseChapters()]);await loadOverview(true);await testEmby();toast('状态已更新。');});
+action('#refresh-connection',async()=>{await refreshProbeStatus(true);await testEmby();toast('连接状态已更新。');});
+action('#refresh-language',async()=>{isoRevision++;isoStatus=null;isoRequest=null;await Promise.all([refreshProbeStatus(true),refreshLibraryTask(),refreshIsoStatus()]);toast('状态已更新。');});
+action('#refresh-infuse',async()=>{const saved=await api('settings');configuration=saved.settings;featureState();await Promise.all([refreshMultiClipStatus(),refreshInfuseChapters()]);toast('状态已更新。');});
 action('#refresh-probe',async()=>{await refreshProbeStatus(true);});
 $('#enable-probe').addEventListener('change',event=>setProbeEnabled(event.currentTarget.checked));
 $('#enable-multiclip').addEventListener('change',event=>setMultiClipEnabled(event.currentTarget.checked));
-action('#test-emby',async()=>{await save();const result=await testEmby();if(!$('#probe-path').value && result.originalProbePath && result.originalProbeAccessible){$('#probe-path').value=result.originalProbePath;await save();showProbeDiscovery(`已自动获取并保存原版 ffprobe 路径：${result.originalProbePath}\n点击「检查 ffprobe」验证运行。`);}else if(!$('#probe-path').value){showProbeDiscovery(result.originalProbePath ? `Emby 返回：${result.originalProbePath}\n本工具无法访问此文件，请检查主机或容器路径。` : '此 Emby 版本未返回原版路径，请检测本机或参考下方路径手动填写。',true);}toast('配置已保存，Emby 连接正常。');});
+// Plain switches save immediately; only text inputs have a save button in their card.
+$('#enable-infuse').addEventListener('change',event=>toggleSetting(event.currentTarget,'enableInfuseLanguagePatch','Infuse UHD 语言补写已开启。','Infuse UHD 语言补写已关闭。'));
+$('#enable-infuse-chapters').addEventListener('change',event=>toggleSetting(event.currentTarget,'enableInfuseChapters','Infuse 原盘章节已开启。请在 Infuse 中强制退出再打开，让它重新同步媒体库。','Infuse 原盘章节已关闭。请在 Infuse 中强制退出再打开，让它重新同步媒体库。'));
+action('#save-addresses',async()=>{await saveSetting({proxyUrl:$('#proxy-url').value.trim().replace(/\/$/,''),managementUrl:$('#management-url').value.trim().replace(/\/$/,'')});showSaved(['proxy-url','management-url']);toast($('#restart-banner').hidden ? '访问地址已保存。' : '访问地址已保存，重新启动本工具后生效。');});
+action('#test-emby',async()=>{await saveServer();const result=await testEmby();if(!$('#probe-path').value && result.originalProbePath && result.originalProbeAccessible){$('#probe-path').value=result.originalProbePath;await saveServer();showProbeDiscovery(`已自动获取并保存原版 ffprobe 路径：${result.originalProbePath}\n点击「检查 ffprobe」验证运行。`);}else if(!$('#probe-path').value){showProbeDiscovery(result.originalProbePath ? `Emby 返回：${result.originalProbePath}\n本工具无法访问此文件，请检查主机或容器路径。` : '此 Emby 版本未返回原版路径，请检测本机或参考下方路径手动填写。',true);}toast('配置已保存，Emby 连接正常。');});
 function showProbeDiscovery(message, failed = false) { const el=$('#probe-discovery-result'); el.hidden=false; el.classList.toggle('failed',failed); el.textContent=message; }
 action('#discover-probe',async()=>{try {const result=await api('probe/discover',{embyUrl:$('#emby-url').value.trim().replace(/\/$/,''),embyApiKey:$('#api-key').value.trim()});if(result.path && result.accessible){$('#probe-path').value=result.path;showProbeDiscovery(result.message+'\n已填入，点击「保存并测试连接」保存。');}else showProbeDiscovery(result.message+(result.path?'\nEmby 返回：'+result.path:''),true);}catch(error){showProbeDiscovery(error.message,true);throw error;}});
-action('#check-probe',async()=>{await save();const result=await api('probe/check',{});$('#connection-result').hidden=false;$('#connection-result').classList.remove('failed');$('#connection-result').textContent=result.message;toast('原版 ffprobe 检查通过。');});
+action('#check-probe',async()=>{await saveServer();const result=await api('probe/check',{});$('#connection-result').hidden=false;$('#connection-result').classList.remove('failed');$('#connection-result').textContent=result.message;toast('原版 ffprobe 检查通过。');});
 action('#detect',async()=>{const result=await api('detect',{});if(result.probePaths.length){$('#probe-path').value=result.probePaths[0];toast('已找到原版 ffprobe，保存后生效。');}else toast('未在常见位置找到 ffprobe，可手动填写完整路径。');$('#connection-result').hidden=false;$('#connection-result').classList.remove('failed');$('#connection-result').textContent=`运行平台：${result.platform}\n`+(result.probePaths.length?'检测到：\n'+result.probePaths.join('\n'):'未检测到默认位置的原版 ffprobe。');});
 action('#recover-probe',()=>setProbeEnabled(false));
 function languageName(code) {
@@ -287,7 +416,6 @@ function renderLibraryTask() {
   const eligible = isoBlocked ? pending - isoPending : pending;
   const probeReady = probeStatus?.state === 'connected' && probeStatus.languagePatchEnabled && !probeChanging && !probeLoading;
   $('#library-scan').disabled = active || libraryChanging;
-  $('#library-scan').textContent = task?.checkedAt ? '重新检查电影库' : '检查电影库';
   $('#library-fill').disabled = !task?.canFill || !eligible || !probeReady || libraryChanging || settingsSaving;
   $('#library-fill').textContent = isoBlocked ? `仅补全 BDMV（${eligible} 部）` : `${task?.operation === 'fill' && !active ? '继续补全所选' : '补全所选媒体库'}${pending ? `（${pending} 部）` : ''}`;
   $('#library-cancel').hidden = !active;
@@ -298,18 +426,18 @@ function renderLibraryTask() {
   $('#library-missing-count').textContent = checked ? summary.missingMovies : '—';
   $('#library-unknown-count').textContent = checked ? summary.unknownMovies : '—';
   $('#library-runtime-count').textContent = checked ? `${summary.missingRuntimeMovies || 0} 部缺少时长` : '需要重新探测后确认';
-  $('#library-movie-count').textContent = task?.moviesChecked ? `${task.moviesChecked} 部电影 · ${summary.uhdMovies} 部 UHD` : '尚未检查电影库';
+  $('#library-movie-count').textContent = task?.moviesChecked ? `${task.moviesChecked} 部电影 · ${summary.uhdMovies} 部 UHD` : '尚未检查媒体库';
   $('#library-track-count').textContent = checked ? `音轨 ${summary.missingAudio} 条 · 字幕 ${summary.missingSubtitles} 条` : '音轨与字幕分别统计';
   $('#library-prerequisite').textContent = task && !task.connectionMatches && task.id
     ? 'Emby 连接已变化，请重新检查电影库生成计划。'
     : !probeReady ? '检查只读取 Emby 已保存的信息；补全前请开启上方「Emby 探测语言补全」并确认已接入。'
     : task?.scanComplete ? '计划包含语言缺失、时长缺失和信息不足的原盘；按所选媒体库补全。'
-    : '先检查电影库，再按计划补全。语言及时长完整的原盘会自动跳过。';
+    : '先检查媒体库，再按计划补全。语言及时长完整的原盘会自动跳过。';
   if (isoBlocked) $('#library-prerequisite').textContent += ` 所选范围有 ${isoPending} 部 ISO 暂不提交探测，请先解决上方 ISO 前置检查提示。${eligible ? `可先补全其余 ${eligible} 部 BDMV。` : ''}`;
   const titles = {idle:'尚未检查',scanning:'正在检查电影库',ready:'检查完成',filling:'正在补全语言',cancelling:'正在停止任务',cancelled:'任务已停止',interrupted:'上次任务中断',completed:'补全任务结束',failed:'任务未完成'};
   $('#library-progress').dataset.state = task?.status || 'idle';
   $('#library-task-title').textContent = titles[task?.status] || titles.idle;
-  $('#library-task-message').textContent = task?.message || '点击「检查电影库」生成补全计划。';
+  $('#library-task-message').textContent = task?.message || '先检查媒体库，再选择需要补全的原盘。';
   const filling = task?.operation === 'fill';
   const done = filling ? task?.processed || 0 : task?.librariesChecked || 0;
   const total = filling ? task?.planned || 0 : task?.libraries?.length || 0;
@@ -401,10 +529,8 @@ async function refreshMediaFeatures() {
   $('#feature-probe-path').value = result.probePath || '';
   const ready = result.enabled && result.automatic === true && result.probeAccessible && result.probeConnected;
   mediaFeatureReady = ready;
-  $('#media-feature-status').dataset.state = ready ? 'connected' : result.enabled ? 'unknown' : 'disconnected';
-  $('#media-feature-title').textContent = ready ? '已启用 · 新影片自动识别' : result.enabled ? '配置需要检查' : '已关闭';
-  $('#media-feature-dot').className = 'status-dot' + (ready ? '' : ' neutral');
-  $('#media-feature-copy').textContent = result.error || (ready ? `Emby 扫描扩展已开启，已自动核验 ${result.checkedItems} 部影片。已有影片可在下方按媒体库批量补充或单独核验。` : '配置独立增强 ffprobe 后打开开关。新影片随入库扫描自动处理，无需逐片点击。');
+  setStatus($('#media-feature-status'), ready ? 'on' : result.enabled ? 'warn' : 'off', ready ? '已启用 · 新影片自动识别' : result.enabled ? '配置需要检查' : '已关闭',
+    result.error || (ready ? `Emby 扫描扩展已开启，已自动核验 ${result.checkedItems} 部影片。已有影片可在下方按媒体库批量补全或单独核验。` : '配置独立增强 ffprobe 后打开开关。新影片随入库扫描自动处理，无需逐片点击。'));
   $('#probe-media-features').disabled = !ready;
   window.dispatchEvent(new Event('helper:media-features'));
 }
@@ -423,6 +549,8 @@ async function configureMediaFeatures() {
   }
 }
 $('#enable-media-features').addEventListener('change',()=>configureMediaFeatures().catch(error=>toast(error.message,true)));
+$('#feature-track-titles').addEventListener('change',()=>configureMediaFeatures().catch(error=>toast(error.message,true)));
+$('#attention-list').addEventListener('click',event=>{const page=event.target.closest('[data-attention]')?.dataset.attention;if(page)navigate(page);});
 action('#save-media-features',configureMediaFeatures);
 action('#refresh-media-features',refreshMediaFeatures);
 action('#check-feature-probe',async()=>{const result=await api('media-features/check',{probePath:$('#feature-probe-path').value.trim()});$('#feature-probe-result').hidden=false;$('#feature-probe-result').textContent=result.version;});

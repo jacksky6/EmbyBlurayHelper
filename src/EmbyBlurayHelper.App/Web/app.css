@@ -28,3 +28,29 @@
 @media(max-width:460px){.sidebar nav{gap:4px}.nav-item{font-size:10px;padding:8px 9px}.nav-item svg{display:block}}
 .feature-batch-recheck{display:flex;align-items:center;gap:8px;font-size:12px;color:#81879e}.feature-batch-recheck input{width:15px;height:15px;accent-color:#8580d2;margin:0}.feature-batch-table td:nth-child(2){white-space:normal;min-width:210px;max-width:350px}.feature-batch-table small{overflow-wrap:anywhere}.feature-batch-table b{font-weight:500;color:#7a78a0}
 #feature-batch-panel .log-table-wrap{min-height:0}
+/* Grouped navigation: Emby library data / Infuse playback / tools / settings. */
+.sidebar{overflow-y:auto;scrollbar-width:none}.sidebar::-webkit-scrollbar{display:none}
+.sidebar nav{display:flex;flex-direction:column;gap:4px;margin-top:34px}.sidebar nav .nav-caption{display:block;margin:18px 15px 6px;font-size:10px;letter-spacing:1.5px;color:#aaadbc}.sidebar nav .nav-caption:first-child{margin-top:0}
+@media(min-width:801px){.nav-item{padding:10px 15px}}
+.breadcrumb .breadcrumb-group{color:#9c9fae}
+/* One status box for every feature card: on / warn / off. */
+.status-box{display:flex;align-items:flex-start;gap:12px;margin-top:22px;padding:16px 19px;border:1px solid #e7e9f1;border-radius:11px;background:#f8f9fc}.status-box>.status-dot{width:8px;height:8px;margin-top:8px;background:#b9c1ce;box-shadow:0 0 0 4px #b9c1ce18}.status-box strong{font-size:14px;font-weight:600;color:#757f92}.status-box p{font-size:12px;color:#8c95a6;margin-top:4px;line-height:1.8}
+.status-box[data-state=on]{background:#f3faf6;border-color:#dceee4}.status-box[data-state=on] strong{color:#3f8065}.status-box[data-state=on]>.status-dot{background:#279c79;box-shadow:0 0 0 4px #279c7916}
+.status-box[data-state=warn]{background:#fffbf3;border-color:#f0e5cd}.status-box[data-state=warn] strong{color:#a17c3e}.status-box[data-state=warn]>.status-dot{background:#c6a25e;box-shadow:0 0 0 4px #c6a25e16}
+.dependency-note{display:flex;align-items:flex-start;gap:10px;margin-top:16px;padding:12px 15px;border:1px dashed #e2e1f2;border-radius:9px;background:#fbfbff}.dependency-note>svg{width:16px;height:16px;margin-top:3px;color:#9a93cc}.dependency-note p{flex:1;font-size:11px;line-height:1.9;color:#8a8ea4}.dependency-note .text-button{flex-shrink:0;font-size:11px;margin-top:2px}
+.multiclip-help .field-help{font-size:12px;color:#858ca0;margin-top:9px}
+/* Overview */
+.feature-group{margin-top:6px}.feature-group+.feature-group{margin-top:22px}.feature-group-title{font-size:12px;font-weight:600;color:#6f7389;margin:0 0 12px;letter-spacing:0}.feature-group-title span{font-weight:400;color:#a2a5b6;font-size:11px;margin-left:8px}
+.feature-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.feature-card{display:flex;flex-direction:column}.feature-card .card-footer{margin-top:auto;padding-top:13px}.feature-card>p{margin-bottom:19px}
+.integration-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}.integration-strip>div{display:flex;align-items:flex-start;gap:10px;padding:13px 16px;background:#fff;border:1px solid var(--line);border-radius:11px;min-width:0}.integration-strip .status-dot{margin-top:7px}.integration-strip>div>span:last-child{font-size:11px;color:#9195a8;min-width:0}.integration-strip strong{display:block;font-size:12px;font-weight:600;color:#5a5f75;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.runtime-line{margin-top:10px;font-size:10px;color:#a8abbb;font-variant-numeric:tabular-nums}
+.attention-list{padding:0 23px}.attention-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f1f2f7;font-size:12px;color:#6f7489}.attention-row:last-child{border:0}.attention-row>span:nth-child(2){flex:1;min-width:0}.attention-row .event-mark{width:22px;height:22px;display:grid;place-items:center;border-radius:6px;flex-shrink:0;background:#fff3df;color:#b08b4c}.attention-row.info .event-mark{background:#f0eefc;color:#8477bf}.attention-row .event-mark svg{width:13px;height:13px}.attention-row .text-button{flex-shrink:0;font-size:11px}
+#setup-notice{display:flex;align-items:center;justify-content:space-between;gap:12px}#setup-notice .text-button{flex-shrink:0;font-size:11px}
+.notice.info{background:#f6f5fe;border-color:#e6e3f7;color:#76719a;margin-bottom:20px}.notice code{font-size:11px;color:#625db0;background:#fff;padding:1px 6px;border-radius:5px}
+.log-table-wrap.compact{min-height:0;max-height:320px;margin-top:12px}
+/* Only the log viewer keeps a fixed minimum; library tables fit their rows. */
+.settings-panel .log-table-wrap{min-height:0}
+@media(max-width:1300px){.feature-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1050px){.integration-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.sidebar{overflow:visible}.sidebar nav{flex-direction:row;margin-top:13px}.sidebar nav .nav-caption{display:none}.feature-grid.four{grid-template-columns:1fr}.dependency-note{flex-wrap:wrap}.attention-list{padding:0 15px}}
+@media(max-width:460px){.integration-strip{grid-template-columns:1fr}}
