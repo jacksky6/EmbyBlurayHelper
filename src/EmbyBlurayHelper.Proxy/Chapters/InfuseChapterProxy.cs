@@ -12,8 +12,11 @@ namespace EmbyBlurayHelper.Proxy.Chapters;
 // Separate from TS language patching and Emby database enrichment. Only Infuse
 // gets an ISO view, and only when Emby already has a valid chapter list.
 internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient client, IMemoryCache cache, ILogger logger,
-    Func<JsonElement, DiscChapterPresentation?>? presentationFactory = null)
+    Func<JsonElement, DiscChapterPresentation?>? presentationFactory = null, DiscListingStore? listingStore = null)
 {
+    private readonly DiscListingStore listings = listingStore ?? new(null, logger);
+    // Shared by all concurrent library pages: at most four discs are read at once.
+    private readonly SemaphoreSlim throttle = new(4);
     private static readonly Regex MetadataRoute = new("^(?:/emby)?/(?:Items/[^/]+/PlaybackInfo|(?:Users/[^/]+/)?Items(?:/[^/]+)?)/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     internal bool IsMetadata(HttpContext context) => config.EnableInfuseChapters && EmbyProxy.IsInfuse(context.Request) && MetadataRoute.IsMatch(context.Request.Path);
 
@@ -47,22 +50,24 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         if (candidates.Count > 0)
         {
             var canonical = await CanonicalSourcesAsync(context, candidates.Select(c => c.Id).Distinct().ToArray());
+            // A per-item line only for single-item responses; library pages are
+            // summarized by LogMetadata, so a NAS-sized sync does not flood the log.
             foreach (var (item, id) in candidates)
-                if (canonical is not null && canonical.TryGetValue(id, out var known) && RewriteItem(context, item, id, known)) rewritten.Add(id);
+                if (canonical is not null && canonical.TryGetValue(id, out var known) && RewriteItem(context, item, id, known, items.Count == 1)) rewritten.Add(id);
                 else unresolved.Add(id);
         }
         LogMetadata(context, rewritten.Count > 0 ? "rewritten" : "unchanged", items.Count, rewritten, unresolved, clock);
         return rewritten.Count > 0 ? Encoding.UTF8.GetBytes(root!.ToJsonString()) : null;
     }
 
-    private bool RewriteItem(HttpContext context, JsonObject obj, string itemId, IReadOnlyDictionary<string, (DiscChapterPresentation? Presentation, string Path)> known)
+    private bool RewriteItem(HttpContext context, JsonObject obj, string itemId, IReadOnlyDictionary<string, (DiscListingStore.Listing? Listing, string Path)> known, bool logDetail)
     {
         var changed = false;
         foreach (var source in (obj["MediaSources"] as JsonArray)?.OfType<JsonObject>() ?? [])
         {
             var sourceId = Text(source["Id"]);
-            if (sourceId is null || !known.TryGetValue(sourceId, out var match) || match.Presentation is null) continue;
-            source["Container"] = "blurayiso"; source["Size"] = match.Presentation.Image.Length; source["Path"] = IsoPath(match.Path);
+            if (sourceId is null || !known.TryGetValue(sourceId, out var match) || match.Listing is null) continue;
+            source["Container"] = "blurayiso"; source["Size"] = match.Listing.Length; source["Path"] = IsoPath(match.Path);
             // Preserve native media-source hints. Infuse can select a different
             // reader when extra URL/MIME hints are injected into the DTO. The
             // authenticated stream route supplies the explicit ISO redirect.
@@ -72,18 +77,18 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         // Infuse can retain item-level information from a library listing.
         // Describe one consistent file at both levels, rather than an ISO
         // media source inside an item still advertised as a BDMV folder.
-        if (known.Count == 1 && known.Values.Single() is { Presentation: { } presentation } single)
+        if (known.Count == 1 && known.Values.Single() is { Listing: { } listing } single)
         {
             if (obj.ContainsKey("Container")) obj["Container"] = "blurayiso";
             if (Text(obj["Path"]) == single.Path) obj["Path"] = IsoPath(single.Path);
-            if (obj.ContainsKey("Size")) obj["Size"] = presentation.Image.Length;
+            if (obj.ContainsKey("Size")) obj["Size"] = listing.Length;
             changed = true;
-            logger.LogInformation("Infuse chapters: item {ItemId}; {Count} saved Emby chapters in virtual ISO, playlist {Playlist}, navigation {Bytes} bytes; original media is read on demand; metadata route {Route}.", itemId, presentation.ChapterCount, presentation.Playlist, presentation.Image.MetadataBytes, context.Request.Path.Value);
+            if (logDetail) logger.LogInformation("Infuse chapters: item {ItemId}; {Count} saved Emby chapters in virtual ISO, playlist {Playlist}, navigation {Bytes} bytes; original media is read on demand; metadata route {Route}.", itemId, listing.ChapterCount, listing.Playlist, listing.MetadataBytes, context.Request.Path.Value);
         }
         return changed;
     }
 
-    private async Task<Dictionary<string, Dictionary<string, (DiscChapterPresentation? Presentation, string Path)>>?> CanonicalSourcesAsync(HttpContext context, string[] ids)
+    private async Task<Dictionary<string, Dictionary<string, (DiscListingStore.Listing? Listing, string Path)>>?> CanonicalSourcesAsync(HttpContext context, string[] ids)
     {
         try
         {
@@ -93,8 +98,7 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
             if (!response.IsSuccessStatusCode) { logger.LogWarning("Infuse chapters: catalog lookup returned {Status}; forwarding original metadata.", (int)response.StatusCode); return null; }
             await using var body = await response.Content.ReadAsStreamAsync(context.RequestAborted);
             using var document = await JsonDocument.ParseAsync(body, cancellationToken: context.RequestAborted);
-            var builds = new List<(string Item, string Source, string Path, Task<DiscChapterPresentation?> Task)>();
-            using var throttle = new SemaphoreSlim(4);
+            var builds = new List<(string Item, string Source, string Path, Task<DiscListingStore.Listing?> Task)>();
             if (!document.RootElement.TryGetProperty("Items", out var list)) return [];
             foreach (var item in list.EnumerateArray())
             {
@@ -103,14 +107,18 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
                     {
                         if (!source.TryGetProperty("Id", out var sourceId)) continue;
                         var copy = source.Clone();
-                        builds.Add((itemId.GetString()!, sourceId.GetString()!, copy.TryGetProperty("Path", out var path) ? path.GetString() ?? "" : "", Task.Run(async () =>
+                        var path = copy.TryGetProperty("Path", out var value) ? value.GetString() ?? "" : "";
+                        // Known items are answered from the record without a disk read.
+                        var task = listings.TryGet(DiscListingStore.Key(copy), out var known) ? Task.FromResult(known) : Task.Run(async () =>
                         {
                             await throttle.WaitAsync(context.RequestAborted);
-                            try { return Build(copy); } finally { throttle.Release(); }
-                        })));
+                            try { return Describe(copy); } finally { throttle.Release(); }
+                        });
+                        builds.Add((itemId.GetString()!, sourceId.GetString()!, path, task));
                     }
             }
-            await Task.WhenAll(builds.Select(b => b.Task));
+            try { await Task.WhenAll(builds.Select(b => b.Task)); }
+            finally { listings.Flush(); }
             return builds.GroupBy(b => b.Item).ToDictionary(g => g.Key, g => g.ToDictionary(b => b.Source, b => (b.Task.Result, b.Path)));
         }
         catch (Exception e) when (e is HttpRequestException or JsonException or InvalidOperationException or ArgumentException ||
@@ -137,8 +145,10 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
     // One diagnostic line per Infuse metadata response. Only route, query key
     // names and the Fields list are logged; never tokens or other values.
     private void LogMetadata(HttpContext context, string result, int items, List<string> rewritten, List<string> unresolved, System.Diagnostics.Stopwatch clock) =>
-        logger.LogInformation("Infuse metadata: {Method} {Route}; query keys {Keys}; fields {Fields}; result {Result}; {Items} items; disc items rewritten [{Rewritten}]; unresolved [{Unresolved}]; elapsed {Elapsed} ms.",
-            context.Request.Method, context.Request.Path.Value, QueryKeys(context), Fields(context), result, items, string.Join(",", rewritten.Take(20)), string.Join(",", unresolved.Take(20)), clock.ElapsedMilliseconds);
+        logger.LogInformation("Infuse metadata: {Method} {Route}; query keys {Keys}; page {Start}+{Limit}; fields {Fields}; result {Result}; {Items} items; disc items rewritten [{Rewritten}]; unresolved [{Unresolved}]; elapsed {Elapsed} ms.",
+            context.Request.Method, context.Request.Path.Value, QueryKeys(context), Number(context, "StartIndex"), Number(context, "Limit"), Fields(context), result, items, string.Join(",", rewritten.Take(20)), string.Join(",", unresolved.Take(20)), clock.ElapsedMilliseconds);
+
+    private static string Number(HttpContext context, string name) => int.TryParse(context.Request.Query[name].ToString(), out var value) ? value.ToString() : "-";
 
     internal void LogUnchanged(HttpContext context, int status, string? contentType) =>
         logger.LogInformation("Infuse metadata: {Method} {Route}; query keys {Keys}; fields {Fields}; result not-rewritable; status {Status}; type {Type}.",
@@ -155,18 +165,46 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
     {
         var key = "chapter-disc:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source.GetRawText())));
         if (cache.TryGetValue<DiscChapterPresentation>(key, out var cached) && cached!.IsCurrent) return cached;
+        var (presentation, definite) = TryCreate(source);
+        if (presentation is not null) cache.Set(key, presentation, new MemoryCacheEntryOptions { Size = Math.Max(1, (presentation.Image.MetadataBytes + 1048575) / 1048576), AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1) });
+        // Playback reads the disc anyway; keep the listing record in step with it.
+        if (definite) { listings.Put(DiscListingStore.Key(source), ToListing(presentation)); listings.Flush(); }
+        return presentation;
+    }
+
+    // Library syncs only consult the listing record. The disc itself is read
+    // once per Emby record, never on every sync.
+    private DiscListingStore.Listing? Describe(JsonElement source)
+    {
+        var key = DiscListingStore.Key(source);
+        if (listings.TryGet(key, out var known)) return known;
+        var (presentation, definite) = TryCreate(source);
+        if (definite) listings.Put(key, ToListing(presentation)); else listings.Defer(key);
+        return ToListing(presentation);
+    }
+
+    private static DiscListingStore.Listing? ToListing(DiscChapterPresentation? p) =>
+        p is null ? null : new(p.Image.Length, p.ChapterCount, p.Playlist, p.Image.MetadataBytes);
+
+    // Definite results are properties of the disc and Emby's record. I/O and
+    // permission failures (an unmounted or sleeping-and-failing volume) are not.
+    private (DiscChapterPresentation? Presentation, bool Definite) TryCreate(JsonElement source)
+    {
         try
         {
-            var presentation = presentationFactory is null ? DiscChapterPresentation.Create(source) : presentationFactory(source);
-            if (presentation is not null) cache.Set(key, presentation, new MemoryCacheEntryOptions { Size = Math.Max(1, (presentation.Image.MetadataBytes + 1048575) / 1048576), AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1) });
-            return presentation;
+            return (presentationFactory is null ? DiscChapterPresentation.Create(source) : presentationFactory(source), true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Infuse chapters: disc temporarily unreadable ({ErrorType}); forwarding original playback information.", e.GetType().Name);
+            return (null, false);
         }
         // InvalidDataException carries "keep the original playback" decisions
         // (no matching title, ambiguous branches); it must not fail the request.
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or OverflowException or JsonException or IndexOutOfRangeException or InvalidDataException or KeyNotFoundException or InvalidOperationException)
+        catch (Exception e) when (e is ArgumentException or OverflowException or JsonException or IndexOutOfRangeException or InvalidDataException or KeyNotFoundException or InvalidOperationException)
         {
             logger.LogWarning("Infuse chapters: presentation unavailable ({ErrorType}); forwarding original playback information.", e.GetType().Name);
-            return null;
+            return (null, true);
         }
     }
 

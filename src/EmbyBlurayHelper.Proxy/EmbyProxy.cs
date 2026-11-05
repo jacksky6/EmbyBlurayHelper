@@ -10,9 +10,9 @@ using EmbyBlurayHelper.Proxy.Chapters;
 namespace EmbyBlurayHelper.Proxy;
 
 internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IMemoryCache cache, ILogger<EmbyProxy> logger,
-    Func<JsonElement, DiscChapterPresentation?>? chapterPresentationFactory = null)
+    Func<JsonElement, DiscChapterPresentation?>? chapterPresentationFactory = null, DiscListingStore? discListings = null)
 {
-    private readonly InfuseChapterProxy chapterProxy = new(config, client, cache, logger, chapterPresentationFactory);
+    private readonly InfuseChapterProxy chapterProxy = new(config, client, cache, logger, chapterPresentationFactory, discListings);
     private static readonly Regex StreamPath = new("^(?:/emby)?/videos/(?<id>[^/]+)/stream(?:\\.[a-z0-9]+)?/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
     { "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Host" };

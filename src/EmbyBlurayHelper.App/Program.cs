@@ -147,6 +147,8 @@ var app = builder.Build();
 app.UseWebSockets();
 var proxies = new Dictionary<ProxyConfiguration, EmbyProxy>();
 var proxyGate = new object();
+// One persisted record shared by every proxy instance; it outlives settings changes.
+var discListings = new EmbyBlurayHelper.Proxy.Chapters.DiscListingStore(Path.Combine(settings.DataDirectory, "infuse-disc-listings.json"), app.Services.GetRequiredService<ILogger<EmbyProxy>>());
 var managementPort = new Uri(settings.Startup.ManagementUrl).Port;
 app.Use(async (context, next) =>
 {
@@ -161,7 +163,7 @@ app.Use(async (context, next) =>
             if (!proxies.TryGetValue(config, out proxy!))
             {
                 proxies.Clear();
-                proxy = new EmbyProxy(config, mediaClient, app.Services.GetRequiredService<IMemoryCache>(), app.Services.GetRequiredService<ILogger<EmbyProxy>>());
+                proxy = new EmbyProxy(config, mediaClient, app.Services.GetRequiredService<IMemoryCache>(), app.Services.GetRequiredService<ILogger<EmbyProxy>>(), discListings: discListings);
                 proxies[config] = proxy;
             }
         }

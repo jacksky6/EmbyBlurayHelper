@@ -17,13 +17,17 @@ internal sealed record DiscChapterPresentation(VirtualUdfImage Image, string Sig
         if (!source.TryGetProperty("Container", out var format) || !string.Equals(format.GetString(), "bluray", StringComparison.OrdinalIgnoreCase) ||
             !source.TryGetProperty("Path", out var pathValue) || !source.TryGetProperty("Chapters", out var chapterValues)) return null;
         var path = pathValue.GetString();
-        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return null;
+        if (string.IsNullOrWhiteSpace(path)) return null;
         var runtime = source.GetProperty("RunTimeTicks").GetInt64();
         var chapters = chapterValues.EnumerateArray().Where(c => !c.TryGetProperty("MarkerType", out var marker) || marker.GetString() is null or "Chapter")
             .Select(c => c.GetProperty("StartPositionTicks").GetInt64()).ToArray();
         if (chapters.Length == 0) return null;
         if (chapters.Length > 10000 || runtime <= 0 || chapters.Any(c => c < 0 || c >= runtime) || !chapters.SequenceEqual(chapters.Distinct().Order()))
             throw new InvalidDataException("Emby 章节时间点无效，保留原播放方式。");
+        // Decide from Emby data first; touch the disk only for a real candidate.
+        // A missing folder is usually an unmounted volume, so it is reported as
+        // a temporary I/O failure rather than a property of the disc.
+        if (!Directory.Exists(path)) throw new DirectoryNotFoundException("原盘目录当前不可访问。");
         var bdmv = Child(path, "BDMV", true) ?? path;
         var playlistDirectory = Child(bdmv, "PLAYLIST", true) ?? throw new InvalidDataException("BDMV 缺少 PLAYLIST。");
         var clipDirectory = Child(bdmv, "CLIPINF", true) ?? throw new InvalidDataException("BDMV 缺少 CLIPINF。");
@@ -66,8 +70,8 @@ internal sealed record DiscChapterPresentation(VirtualUdfImage Image, string Sig
         var stamps = new List<string>();
         foreach (var id in clips.Select(Path.GetFileNameWithoutExtension).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var clpi = Child(clipDirectory, id + ".clpi", false) ?? throw new FileNotFoundException("Missing CLPI.");
-            var clip = Child(streamDirectory, id + ".m2ts", false) ?? throw new FileNotFoundException("Missing M2TS.");
+            var clpi = Child(clipDirectory, id + ".clpi", false) ?? throw new InvalidDataException("原盘缺少 CLPI。");
+            var clip = Child(streamDirectory, id + ".m2ts", false) ?? throw new InvalidDataException("原盘缺少 M2TS。");
             var b = SmallFile(clpi); files.Add(new("BDMV/CLIPINF/" + id + ".clpi", null, b.Length, b));
             var info = new FileInfo(clip); files.Add(new("BDMV/STREAM/" + id + ".m2ts", clip, info.Length));
             originals.Add(clpi); originals.Add(clip);
