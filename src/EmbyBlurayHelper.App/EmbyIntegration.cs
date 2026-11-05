@@ -288,7 +288,10 @@ internal sealed class EmbyIntegration(SettingsStore settings, HttpClient client,
             var path = source.GetProperty("Path").GetString();
             var types = new Dictionary<ushort, string>();
             var map = BlurayLanguageMap.Load(source, factory.CreateLogger("Disc"), types);
-            sources.Add(new { path, readable = Directory.Exists(path),
+            var container = source.TryGetProperty("Container", out var format) ? format.GetString() ?? "" : "";
+            sources.Add(new { id = source.TryGetProperty("Id", out var id) ? id.GetString() : null, container,
+                isIso = container.Equals("blurayiso", StringComparison.OrdinalIgnoreCase) || (path?.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) ?? false),
+                path, readable = Directory.Exists(path),
                 languages = map?.OrderBy(p => p.Key).Select(p => new { pid = "0x" + p.Key.ToString("X4"), language = p.Value,
                     type = types.GetValueOrDefault(p.Key, "Unknown") }).ToArray() });
         }

@@ -350,9 +350,59 @@ function renderDiscSource(source) {
     .map(([type,title,color]) => ({type,title,color,tracks:tracks.filter(track => (['Audio','Subtitle'].includes(track.type) ? track.type : 'Unknown') === type)}));
   const sections = groups.filter(group => group.tracks.length).map(group => `<section class="track-group ${group.color}" data-type="${group.type}" aria-label="${group.title}"><div class="track-group-heading"><h4>${group.title}</h4><span class="track-count">${group.tracks.length}</span></div><div class="language-chips">${group.tracks.map(track => `<span class="language-chip"><span class="track-language">${escapeHtml(languageName(track.language))}</span><span class="track-code">${escapeHtml(track.language)}</span><span class="track-pid">${escapeHtml(track.pid)}</span></span>`).join('')}</div></section>`).join('');
   const counts = groups.filter(group => group.tracks.length).map(group => `${group.tracks.length} 条${group.title}`).join(' · ');
-  return `<div class="disc-source"><div class="disc-source-heading"><span class="tag ${source.readable?'':'off'}">${source.readable?'目录可读取':'目录不可读取'}</span><span class="disc-track-summary">${escapeHtml(counts)}</span></div><code>${escapeHtml(source.path)}</code>${sections || '<p class="disc-empty">未获得符合 UHD 补写条件的语言映射。请检查影片类型、目录和播放列表。</p>'}</div>`;
+  const state = source.isIso ? ['','ISO 文件'] : source.readable ? ['','目录可读取'] : ['off','目录不可读取'];
+  const empty = source.isIso ? 'ISO 的音轨与字幕语言由 Emby 探测器读取，见上方「语言与时长」。' : '未获得符合 UHD 补写条件的语言映射。请检查影片类型、目录和播放列表。';
+  return `<div class="disc-source"><div class="disc-source-heading"><span class="tag ${state[0]}">${state[1]}</span><span class="disc-track-summary">${escapeHtml(counts)}</span></div><code>${escapeHtml(source.path)}</code>${sections || `<p class="disc-empty">${empty}</p>`}</div>`;
 }
-action('#inspect',async()=>{const result=await api('disc/check',{itemId:$('#item-id').value.trim()});const el=$('#disc-result');el.hidden=false;el.innerHTML=`<h3>${escapeHtml(result.name)}</h3>`+result.sources.map(renderDiscSource).join('');});
+// One movie across every feature: the live disc read plus each page's last
+// saved check. Only the explicit spec action below writes to Emby.
+let inspection = null;
+action('#inspect',async()=>{
+  const itemId=$('#item-id').value.trim(), out=$('#disc-result');
+  // Never leave the previous movie on screen while the next one is read.
+  out.hidden=false; out.innerHTML='<p class="muted">正在读取这部影片的信息…</p>';
+  try {
+    const disc=await api('disc/check',{itemId});
+    const get=path=>api(path).catch(error=>({error:error.message}));
+    const [language,features,chapters,infuse,featureStatus]=await Promise.all([get('library-language'),get('media-features/batch'),get('chapters/batch'),get('infuse/chapters/'+encodeURIComponent(itemId)),get('media-features')]);
+    inspection={itemId,disc,language,features,chapters,infuse,featureReady:!featureStatus.error && featureStatus.enabled && featureStatus.automatic === true && featureStatus.probeAccessible && featureStatus.probeConnected};
+    renderInspection();
+  } catch (error) { out.innerHTML=`<p class="error">${escapeHtml(error.message)}</p>`; throw error; }
+});
+function renderInspection() {
+  const { itemId, disc, language, features, chapters, infuse, featureReady } = inspection;
+  const find = snapshot => snapshot?.items?.find(i => i.id === itemId);
+  const missing = page => `<p class="muted">不在上次的媒体库检查结果中。普通 MKV / MP4 不处理；原盘请先在「${labels[page]}」检查媒体库。</p>`;
+  const card = (title, page, body) => `<section class="inspect-card"><div class="inspect-card-heading"><h4>${title}</h4><button class="text-button accent" data-goto-inspect="${page}">${labels[page]} →</button></div>${body}</section>`;
+  const l = find(language);
+  const languageBody = !l ? missing('language') : `<p><span class="tag ${l.classification === 'complete' ? '' : 'off'}">${({complete:'信息完整',missing:'语言缺失',unknown:'信息不足',unsupported:'暂不支持'})[l.classification] || '待确认'}</span></p><p>时长：${renderLibraryDurations(l)}</p><p>缺失：音轨 ${l.missingAudio} · 字幕 ${l.missingSubtitles}</p>`;
+  const f = find(features), isDisc = disc.sources.some(s => s.isIso || s.container === 'bluray');
+  const probeHint = !isDisc ? '只处理 BDMV 与 Blu-ray ISO。' : !featureReady ? '需要先在「音视频规格」开启规格识别。' : '';
+  const featureBody = (!f ? missing('media-features') : f.sources.map(s => `<p><b>${escapeHtml(s.kind)}</b> · ${escapeHtml(s.details)}</p>`).join('') + `<p><span class="tag ${f.verified ? '' : 'off'}">${f.verified ? '已核验' : '待核验'}</span></p>`)
+    + `<div class="form-actions"><button class="button secondary" id="inspect-probe-features" ${probeHint ? 'disabled' : ''}>识别并保存规格</button></div>${probeHint ? `<p class="field-help">${probeHint}</p>` : ''}<pre class="result" id="inspect-feature-result" hidden></pre>`;
+  const c = find(chapters), stateNames = { empty:'缺少章节', generated:'等间隔生成', existing:'已有章节，保留', managed:'原生章节已核验', error:'需重试' };
+  const chapterBody = !c ? missing('chapters') : c.sources.map(s => `<p><b>${escapeHtml(s.kind)}</b> · ${s.count} 个章节 · ${escapeHtml(stateNames[s.state] || s.state)}${s.playlist ? ' · ' + escapeHtml(s.playlist) : ''}</p>`).join('');
+  const records = new Map((infuse?.sources || []).map(s => [s.sourceId, s]));
+  const infuseBody = (infuse?.enabled === false ? '<p class="muted">「Infuse 原盘章节」已关闭，Infuse 按原方式播放。</p>' : '') + disc.sources.map((s, index) => {
+    const name = disc.sources.length > 1 ? `版本 ${index + 1} · ` : '', r = records.get(s.id);
+    const text = s.isIso ? '真实 ISO，Infuse 直接读取原盘' : s.container !== 'bluray' ? '非原盘，按原方式播放'
+      : r?.iso ? `虚拟 ISO · ${r.chapters} 个章节 · ${escapeHtml(r.playlist || '')}` : r?.reason ? `保留原播放方式：${escapeHtml(r.reason)}` : 'Infuse 尚未同步这部影片';
+    return `<p>${name}${text}</p>`;
+  }).join('');
+  $('#disc-result').hidden = false;
+  $('#disc-result').innerHTML = `<h3>${escapeHtml(disc.name)} <small>ID ${escapeHtml(itemId)}</small></h3>
+   <div class="inspect-grid">${card('语言与时长','language',languageBody)}${card('音视频规格','media-features',featureBody)}${card('原盘章节','chapters',chapterBody)}${card('Infuse 呈现','infuse',infuseBody)}</div>
+   <h4 class="inspect-subtitle">原盘音轨与字幕</h4>${disc.sources.map(renderDiscSource).join('')}`;
+}
+$('#disc-result').addEventListener('click', async event => {
+  const page = event.target.closest('[data-goto-inspect]')?.dataset.gotoInspect;
+  if (page) { navigate(page); return; }
+  const button = event.target.closest('#inspect-probe-features'); if (!button) return;
+  const output = $('#inspect-feature-result'); button.disabled = true; output.hidden = false; output.textContent = '正在读取所选正片并保存已确认的规格…';
+  try { const result = await api('media-features/probe',{itemId:inspection.itemId}); output.textContent = result.name + '\n\n' + result.streams.map(s => `#${s.Index} · ${s.Codec.toUpperCase()} · ${s.Title || s.Profile || '基础规格保留'}${s.Language ? ' · ' + s.Language : ''}`).join('\n'); toast('规格已保存到 Emby。'); }
+  catch (error) { output.textContent = error.message; toast(error.message, true); }
+  finally { button.disabled = false; }
+});
 
 async function refreshIsoStatus() {
   if (isoRequest) return isoRequest;
@@ -442,7 +492,6 @@ async function refreshMediaFeatures() {
   mediaFeatureReady = ready;
   setStatus($('#media-feature-status'), ready ? 'on' : result.enabled ? 'warn' : 'off', ready ? '已启用 · 新影片自动识别' : result.enabled ? '配置需要检查' : '已关闭',
     result.error || (ready ? `Emby 扫描扩展已开启，已自动核验 ${result.checkedItems} 部影片。已有影片可在下方按媒体库批量补全或单独核验。` : '配置独立增强 ffprobe 后打开开关。新影片随入库扫描自动处理，无需逐片点击。'));
-  $('#probe-media-features').disabled = !ready;
   window.dispatchEvent(new Event('helper:media-features'));
 }
 async function configureMediaFeatures() {
@@ -465,9 +514,4 @@ $('#attention-list').addEventListener('click',event=>{const page=event.target.cl
 action('#save-media-features',configureMediaFeatures);
 action('#refresh-media-features',refreshMediaFeatures);
 action('#check-feature-probe',async()=>{const result=await api('media-features/check',{probePath:$('#feature-probe-path').value.trim()});$('#feature-probe-result').hidden=false;$('#feature-probe-result').textContent=result.version;});
-action('#probe-media-features',async()=>{
-  const output=$('#feature-item-result');output.hidden=false;output.textContent='正在读取所选正片并保存已确认的规格…';
-  try { const result=await api('media-features/probe',{itemId:$('#feature-item-id').value.trim()}); output.textContent=result.name+'\n\n'+result.streams.map(s=>`#${s.Index} · ${s.Codec.toUpperCase()} · ${s.Title || s.Profile || '基础规格保留'}${s.Language ? ' · '+s.Language : ''}`).join('\n'); }
-  catch(error){output.textContent=error.message;throw error;}
-});
 startConsole().catch(()=>{});

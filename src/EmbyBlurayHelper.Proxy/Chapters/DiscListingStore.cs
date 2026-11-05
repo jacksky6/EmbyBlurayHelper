@@ -77,14 +77,25 @@ internal sealed class DiscListingStore(string? path, ILogger logger)
     // One row per disc source: the record in use this session, otherwise the
     // most recently saved one. Items whose sources all keep the original
     // playback are listed with the reason.
+    private Entry[] Latest()
+    {
+        var all = entries!;
+        return all.Where(e => e.Value.SourceId is not null).GroupBy(e => e.Value.SourceId!)
+            .Select(g => current.TryGetValue(g.Key, out var key) && all.TryGetValue(key, out var used) ? used : g.MaxBy(e => e.Value.Saved).Value).ToArray();
+    }
+
+    // What Infuse was last told about each source of one item; read-only.
+    internal IReadOnlyList<(string SourceId, Listing? Listing, string? Reason)> ForItem(string itemId)
+    {
+        lock (gate) { Load(); return Latest().Where(e => e.ItemId == itemId).Select(e => (e.SourceId!, e.Listing, e.Reason)).ToArray(); }
+    }
+
     internal (int Available, IReadOnlyList<Unresolved> Unavailable) Summary()
     {
         lock (gate)
         {
             Load();
-            var all = entries!;
-            var latest = all.Where(e => e.Value.SourceId is not null).GroupBy(e => e.Value.SourceId!)
-                .Select(g => current.TryGetValue(g.Key, out var key) && all.TryGetValue(key, out var used) ? used : g.MaxBy(e => e.Value.Saved).Value).ToArray();
+            var latest = Latest();
             var available = latest.Where(e => e.Listing is not null).Select(e => e.ItemId).ToHashSet();
             var unavailable = latest.Where(e => e.Listing is null && e.Reason is not null && !available.Contains(e.ItemId))
                 .GroupBy(e => e.ItemId).Select(g => g.First()).Select(e => new Unresolved(e.ItemId!, e.Name ?? e.ItemId!, e.Reason!))
