@@ -6,8 +6,6 @@ let probeStatus = null, probeLoading = false, probeRevision = 0, probeCheckedAt 
 let probeChanging = false, settingsSaving = false;
 let logRevision = 0, logsClearing = false;
 let multiClipStatus = null, multiClipChanging = false, multiClipRevision = 0;
-let libraryTask = null, libraryTimer, libraryRequest, libraryRevision = 0, libraryChanging = false, libraryPage = 0;
-let librarySelectionPlan = '', librarySelectionInitialized = false, selectedLibraryIds = new Set();
 let isoStatus = null, isoLoading = false, isoRequest = null, isoRevision = 0;
 const labels = { overview:'概览', language:'语言与时长', 'media-features':'音视频规格', chapters:'章节与截图', infuse:'播放增强', diagnostics:'单片检查', logs:'运行日志', connection:'连接与账号' };
 const groups = { overview:'工作空间', language:'Emby 媒体库', 'media-features':'Emby 媒体库', chapters:'Emby 媒体库', infuse:'Infuse 播放', diagnostics:'工具', logs:'工具', connection:'设置' };
@@ -24,7 +22,7 @@ async function api(path, body) {
   if (!response.ok) throw new Error(result.error || '请求未完成，请查看运行日志。');
   return result;
 }
-function showLogin() { clearInterval(pollTimer); clearTimeout(libraryTimer); libraryRevision++; libraryTask = null; isoRevision++; isoStatus = null; isoRequest = null; isoLoading = false; probeRevision++; probeStatus = null; probeRequest = null; probeCheckedAt = 0; mediaFeatureReady = false; $('#account-password').value = ''; $('#console').hidden = true; $('#login').hidden = false; window.dispatchEvent(new Event('helper:logout')); }
+function showLogin() { clearInterval(pollTimer); isoRevision++; isoStatus = null; isoRequest = null; isoLoading = false; probeRevision++; probeStatus = null; probeRequest = null; probeCheckedAt = 0; mediaFeatureReady = false; $('#account-password').value = ''; $('#console').hidden = true; $('#login').hidden = false; window.dispatchEvent(new Event('helper:logout')); }
 function navigate(page) {
   if (page === 'features') page = 'language';
   if (!labels[page]) page = 'overview';
@@ -37,8 +35,7 @@ function navigate(page) {
   if (configuration && !$('#console').hidden && ['overview','language'].includes(page)) refreshProbeStatus().catch(() => {});
   if (configuration && !$('#console').hidden && ['overview','infuse'].includes(page)) { refreshMultiClipStatus().catch(() => {}); refreshInfuseChapters().catch(() => {}); }
   if (configuration && !$('#console').hidden && page === 'overview') loadOverview().catch(() => {});
-  clearTimeout(libraryTimer);
-  if (configuration && !$('#console').hidden && page === 'language') { refreshLibraryTask().catch(() => {}); refreshIsoStatus().catch(() => {}); }
+  if (configuration && !$('#console').hidden && page === 'language') refreshIsoStatus().catch(() => {});
   if (configuration && !$('#console').hidden && page === 'media-features') refreshMediaFeatures().catch(error => toast(error.message,true));
   window.dispatchEvent(new Event('helper:navigate'));
 }
@@ -327,7 +324,7 @@ action('#logout',async()=>{await api('logout',{});showLogin();});
 action('#clear-logs',async()=>{if(!await confirm('清除全部运行日志？','将删除本工具保存的全部运行日志，包括历史日志和当前页面中的记录，清除后无法恢复。配置和运行统计保持不变。','清除全部'))return;logsClearing=true;logRevision++;try{const result=await api('logs/clear',{});logEntries=[];renderLogs();toast(result.message);}finally{logsClearing=false;logRevision++;}});
 action('#refresh-status',async()=>{await Promise.all([refresh(),refreshProbeStatus(true),refreshMultiClipStatus(),refreshInfuseChapters()]);await loadOverview(true);await testEmby();toast('状态已更新。');});
 action('#refresh-connection',async()=>{await refreshProbeStatus(true);await testEmby();toast('连接状态已更新。');});
-action('#refresh-language',async()=>{isoRevision++;isoStatus=null;isoRequest=null;await Promise.all([refreshProbeStatus(true),refreshLibraryTask(),refreshIsoStatus()]);toast('状态已更新。');});
+action('#refresh-language',async()=>{isoRevision++;isoStatus=null;isoRequest=null;await Promise.all([refreshProbeStatus(true),languageBatch.refresh(),refreshIsoStatus()]);toast('状态已更新。');});
 action('#refresh-infuse',async()=>{const saved=await api('settings');configuration=saved.settings;featureState();await Promise.all([refreshMultiClipStatus(),refreshInfuseChapters()]);toast('状态已更新。');});
 action('#refresh-probe',async()=>{await refreshProbeStatus(true);});
 $('#enable-probe').addEventListener('change',event=>setProbeEnabled(event.currentTarget.checked));
@@ -382,94 +379,6 @@ function renderIsoStatus() {
   $('#iso-checked-at').textContent = `${isoStatus?.checkedAt ? '检查于 ' + new Date(isoStatus.checkedAt).toLocaleString('zh-CN',{hour12:false}) + '。' : ''}安装或更新 DLL 并重启 Emby 后，点击「重新检查」。BDMV 补全不依赖 ISO 插件。`;
   $('#refresh-iso').disabled = isoLoading;
 }
-function scheduleLibraryRefresh() {
-  clearTimeout(libraryTimer);
-  if (libraryTask?.active && !document.hidden && !$('#console').hidden && location.hash === '#language')
-    libraryTimer = setTimeout(() => refreshLibraryTask().catch(() => {}), 2000);
-}
-async function refreshLibraryTask() {
-  if (libraryRequest) return libraryRequest;
-  const revision = libraryRevision;
-  libraryRequest = (async () => {
-    try {
-      const result = await api('library-language');
-      if (revision === libraryRevision) { const scanFinished = libraryTask?.status === 'scanning' && !result.active; libraryTask = result; $('#library-error').hidden = true; renderLibraryTask(); if (scanFinished) refreshIsoStatus().catch(()=>{}); }
-    } catch(error) {
-      if (revision === libraryRevision) { $('#library-error').hidden = false; $('#library-error').textContent = error.message; }
-      throw error;
-    } finally { libraryRequest = null; scheduleLibraryRefresh(); }
-  })();
-  return libraryRequest;
-}
-function renderLibraryTask() {
-  renderIsoStatus();
-  const task = libraryTask, active = !!task?.active, checked = !!task?.checkedAt || task?.moviesChecked > 0;
-  if (task && librarySelectionPlan !== task.id) { librarySelectionPlan = task.id; librarySelectionInitialized = false; selectedLibraryIds = new Set(); }
-  if (task?.libraries?.length && (!librarySelectionInitialized || task.status === 'scanning')) {
-    selectedLibraryIds = new Set(task.operation === 'fill' && task.selectedLibraryIds?.length ? task.selectedLibraryIds : (task.libraries || []).map(l => l.id));
-    librarySelectionInitialized = true;
-  }
-  if (task?.operation === 'fill' && task.active) selectedLibraryIds = new Set(task.selectedLibraryIds);
-  const summary = task?.summary, pendingMovies = chosenLibraryMovies().filter(i => ['missing','unknown'].includes(i.classification));
-  const pending = pendingMovies.length, isoPending = pendingMovies.filter(i => i.sources?.some(s => s.isIso)).length;
-  const isoBlocked = isoPending > 0 && (!isoStatus?.canProbe || isoLoading);
-  const eligible = isoBlocked ? pending - isoPending : pending;
-  const probeReady = probeStatus?.state === 'connected' && probeStatus.languagePatchEnabled && !probeChanging && !probeLoading;
-  $('#library-scan').disabled = active || libraryChanging;
-  $('#library-fill').disabled = !task?.canFill || !eligible || !probeReady || libraryChanging || settingsSaving;
-  $('#library-fill').textContent = isoBlocked ? `仅补全 BDMV（${eligible} 部）` : `${task?.operation === 'fill' && !active ? '继续补全所选' : '补全所选媒体库'}${pending ? `（${pending} 部）` : ''}`;
-  $('#library-cancel').hidden = !active;
-  $('#library-cancel').disabled = libraryChanging || task?.status === 'cancelling';
-  $('#library-refresh').disabled = libraryChanging;
-  $('#library-disc-count').textContent = checked ? summary.blurayMovies : '—';
-  $('#library-complete-count').textContent = checked ? summary.completeMovies : '—';
-  $('#library-missing-count').textContent = checked ? summary.missingMovies : '—';
-  $('#library-unknown-count').textContent = checked ? summary.unknownMovies : '—';
-  $('#library-runtime-count').textContent = checked ? `${summary.missingRuntimeMovies || 0} 部缺少时长` : '需要重新探测后确认';
-  $('#library-movie-count').textContent = task?.moviesChecked ? `${task.moviesChecked} 部电影 · ${summary.uhdMovies} 部 UHD` : '尚未检查媒体库';
-  $('#library-track-count').textContent = checked ? `音轨 ${summary.missingAudio} 条 · 字幕 ${summary.missingSubtitles} 条` : '音轨与字幕分别统计';
-  $('#library-prerequisite').textContent = task && !task.connectionMatches && task.id
-    ? 'Emby 连接已变化，请重新检查电影库生成计划。'
-    : !probeReady ? '检查只读取 Emby 已保存的信息；补全前请开启上方「Emby 探测语言补全」并确认已接入。'
-    : task?.scanComplete ? '计划包含语言缺失、时长缺失和信息不足的原盘；按所选媒体库补全。'
-    : '先检查媒体库，再按计划补全。语言及时长完整的原盘会自动跳过。';
-  if (isoBlocked) $('#library-prerequisite').textContent += ` 所选范围有 ${isoPending} 部 ISO 暂不提交探测，请先解决上方 ISO 前置检查提示。${eligible ? `可先补全其余 ${eligible} 部 BDMV。` : ''}`;
-  const titles = {idle:'尚未检查',scanning:'正在检查电影库',ready:'检查完成',filling:'正在补全语言',cancelling:'正在停止任务',cancelled:'任务已停止',interrupted:'上次任务中断',completed:'补全任务结束',failed:'任务未完成'};
-  $('#library-progress').dataset.state = task?.status || 'idle';
-  $('#library-task-title').textContent = titles[task?.status] || titles.idle;
-  $('#library-task-message').textContent = task?.message || '先检查媒体库，再选择需要补全的原盘。';
-  const filling = task?.operation === 'fill';
-  const done = filling ? task?.processed || 0 : task?.librariesChecked || 0;
-  const total = filling ? task?.planned || 0 : task?.libraries?.length || 0;
-  const bar = $('#library-task-bar'); bar.hidden = !task?.id;
-  if (active && !total) bar.removeAttribute('value');
-  else { bar.max = Math.max(1,total); bar.value = Math.min(done,total); }
-  $('#library-task-percent').textContent = total ? `${done} / ${total}${filling ? ' 部' : ' 个媒体库'}` : '';
-  $('#library-current').hidden = !task?.currentName || !active;
-  const current = task?.items.find(i => i.id === task.currentItemId);
-  const elapsed = current?.attemptedAt ? ` · 已用 ${Math.max(0,Math.floor((Date.now()-new Date(current.attemptedAt))/1000))} 秒` : '';
-  $('#library-current').textContent = task?.currentName ? `当前：${task.currentName}${current?.message ? ' · ' + current.message : ''}${elapsed}` : '';
-  $('#library-task-counts').textContent = filling ? `成功 ${task.completed} · 仍有缺失 ${task.partial} · 失败 / 未核验 ${task.failed} · 跳过 ${task.skipped}` : '进度仅在任务运行且此页面可见时自动刷新';
-  const at = task?.finishedAt || task?.startedAt;
-  $('#library-task-time').textContent = at ? `${task.finishedAt ? '结束' : '开始'}于 ${new Date(at).toLocaleString('zh-CN',{hour12:false})}` : '';
-  if (task?.persistenceWarning) { $('#library-error').hidden = false; $('#library-error').textContent = task.persistenceWarning; }
-  $('#library-details').hidden = !task?.items.length;
-  $('#library-detail-count').textContent = task?.items.length ? `${task.items.length} 部` : '';
-  renderLibraryGroups();
-  renderLibraryRows();
-}
-function chosenLibraryMovies() { return (libraryTask?.items || []).filter(i => (i.libraryIds || []).some(id => selectedLibraryIds.has(id))); }
-function renderLibraryGroups() {
-  const groups = libraryTask?.libraries || [], active = libraryTask?.active || libraryChanging;
-  $('#library-scope').hidden = groups.length === 0;
-  const all = $('#library-select-all');
-  const selected = groups.filter(l => selectedLibraryIds.has(l.id));
-  all.checked = groups.length > 0 && selected.length === groups.length;
-  all.indeterminate = selected.length > 0 && selected.length < groups.length; all.disabled = active;
-  $('#library-groups').innerHTML = groups.map(l => `<tr><td><label><input type="checkbox" data-library-id="${escapeHtml(l.id)}" ${selectedLibraryIds.has(l.id) ? 'checked' : ''} ${active ? 'disabled' : ''}><span>${escapeHtml(l.name)}</span></label></td><td>${l.moviesChecked}${l.scanComplete ? '' : ' / ' + l.moviesTotal}</td><td>${l.blurayMovies}</td><td>${l.completeMovies}</td><td>${l.missingMovies}<small>音轨 ${l.missingAudio} · 字幕 ${l.missingSubtitles}</small></td><td>${l.unknownMovies}</td><td>${l.taskPlanned ? l.taskProcessed + ' / ' + l.taskPlanned : '—'}</td></tr>`).join('');
-  const pending = chosenLibraryMovies().filter(i=>['missing','unknown'].includes(i.classification)).length;
-  $('#library-selection-summary').textContent = `已选 ${selected.length} / ${groups.length} 个媒体库 · 待补全 ${pending} 部（按电影去重）。${libraryTask?.operation === 'fill' && libraryTask.scope ? '本次任务范围：' + libraryTask.scope + '。' : ''}`;
-}
 function formatLibraryRuntime(ticks) {
   if (!Number.isFinite(ticks) || ticks <= 0) return '未识别';
   const seconds = Math.floor(ticks / 10000000);
@@ -480,45 +389,47 @@ function renderLibraryDurations(item) {
   if (!sources.length) return '未识别';
   return sources.map((s,index)=>`<span>${sources.length > 1 ? `版本 ${index+1} · ` : ''}${formatLibraryRuntime(s.runTimeTicks)}</span>`).join('<br>');
 }
-function renderLibraryRows() {
-  const filter = $('#library-filter').value;
-  const rows = chosenLibraryMovies().filter(i => filter === 'pending' ? ['missing','unknown'].includes(i.classification) : filter === 'issues' ? ['failed','partial','unverified'].includes(i.result) : true);
-  const pages = Math.max(1,Math.ceil(rows.length / 30));
-  libraryPage = Math.max(0,Math.min(libraryPage,pages-1));
-  const classification = {complete:'信息完整',missing:'语言缺失',unknown:'信息不足',unsupported:'暂不支持'};
-  const result = {pending:'等待补全',running:'处理中',completed:'已核验成功',partial:'仍有缺失',failed:'失败',unverified:'未核验',skipped:'已跳过'};
-  $('#library-rows').innerHTML = rows.slice(libraryPage*30,libraryPage*30+30).map(i => `<tr><td><strong>${escapeHtml(i.name)}</strong><small>ID ${escapeHtml(i.id)} · ${escapeHtml(i.format)} · ${escapeHtml((libraryTask.libraries || []).filter(l=>i.libraryIds.includes(l.id)).map(l=>l.name).join('、'))}</small></td><td><span class="tag ${i.classification === 'complete' ? '' : 'off'}">${classification[i.classification] || '待确认'}</span></td><td>${renderLibraryDurations(i)}</td><td>音轨 ${i.missingAudio} · 字幕 ${i.missingSubtitles}</td><td><strong class="library-result ${escapeHtml(i.result)}">${result[i.result] || '—'}</strong><small>${escapeHtml(i.message)}${i.verifiedAt ? ' · 核验于 ' + escapeHtml(new Date(i.verifiedAt).toLocaleString('zh-CN',{hour12:false})) : ''}</small></td></tr>`).join('') || '<tr><td colspan="5" class="empty">此筛选下没有影片</td></tr>';
-  $('#library-table-count').textContent = `${rows.length} 部`;
-  $('#library-page').textContent = `${libraryPage+1} / ${pages}`;
-  $('#library-prev').disabled = libraryPage === 0;
-  $('#library-next').disabled = libraryPage >= pages-1;
-}
-async function changeLibraryTask(operation) {
-  if (libraryChanging) return;
-  libraryChanging = true; libraryRevision++; clearTimeout(libraryTimer); renderLibraryTask();
-  try {
-    if (operation === 'fill' && chosenLibraryMovies().some(i => ['missing','unknown'].includes(i.classification) && i.sources?.some(s => s.isIso))) {
-      await refreshIsoStatus();
-      if (!isoStatus?.canProbe && !chosenLibraryMovies().some(i => ['missing','unknown'].includes(i.classification) && !i.sources?.some(s => s.isIso))) {
-        toast(isoStatus?.message || 'ISO 补全前置检查未通过。',true); return;
-      }
-    }
-    libraryTask = await api('library-language/'+operation,operation === 'fill' ? {planId:libraryTask.id,libraryIds:[...selectedLibraryIds]} : {});
-    $('#library-error').hidden = true; libraryPage = 0;
-    toast(operation === 'scan' ? '已开始检查电影库。' : operation === 'fill' ? '补全任务已启动，可在此查看进度。' : '正在停止任务。');
-  } catch(error) { toast(error.message,true); }
-  finally { libraryChanging = false; renderLibraryTask(); scheduleLibraryRefresh(); }
-}
-$('#library-scan').addEventListener('click',()=>changeLibraryTask('scan'));
-$('#library-fill').addEventListener('click',()=>changeLibraryTask('fill'));
-$('#library-cancel').addEventListener('click',()=>changeLibraryTask('cancel'));
-$('#library-refresh').addEventListener('click',()=>refreshLibraryTask().catch(error=>toast(error.message,true)));
+const languagePending = i => ['missing','unknown'].includes(i.classification);
+const probeReady = () => probeStatus?.state === 'connected' && probeStatus.languagePatchEnabled && !probeChanging && !probeLoading;
+const languageBatch = BatchPanel({
+  prefix:'library', mount:'library-batch', page:'language', api:'library-language', noun:'语言与时长', progress:true,
+  checked: task => !!task?.checkedAt || task?.moviesChecked > 0,
+  counts:[
+    { key:'discs', label:'原盘影片', idle:'尚未检查媒体库', value:t => t.summary.blurayMovies, foot:t => `${t.moviesChecked} 部电影 · ${t.summary.uhdMovies} 部 UHD` },
+    { key:'complete', label:'信息完整', idle:'轨道语言及时长均完整', value:t => t.summary.completeMovies, foot:() => '轨道语言及时长均完整' },
+    { key:'missing', label:'语言缺失', idle:'音轨与字幕分别统计', value:t => t.summary.missingMovies, foot:t => `音轨 ${t.summary.missingAudio} 条 · 字幕 ${t.summary.missingSubtitles} 条` },
+    { key:'unknown', label:'信息不足', idle:'需要重新探测后确认', value:t => t.summary.unknownMovies, foot:t => `${t.summary.missingRuntimeMovies || 0} 部缺少时长` }],
+  columns:[
+    { label:'电影', cell:l => `${l.moviesChecked}${l.scanComplete ? '' : ' / ' + l.moviesTotal}` },
+    { label:'原盘', cell:l => l.blurayMovies }, { label:'信息完整', cell:l => l.completeMovies },
+    { label:'语言缺失', cell:l => `${l.missingMovies}<small>音轨 ${l.missingAudio} · 字幕 ${l.missingSubtitles}</small>` },
+    { label:'信息不足', cell:l => l.unknownMovies }],
+  itemColumns:['信息状态','时长','缺失语言'], pendingLabel:'待补全', issuesLabel:'失败 / 仍有缺失',
+  pending: languagePending, issue: i => ['failed','partial','unverified'].includes(i.result),
+  meta: i => escapeHtml(i.format),
+  cells: i => [`<span class="tag ${i.classification === 'complete' ? '' : 'off'}">${({complete:'信息完整',missing:'语言缺失',unknown:'信息不足',unsupported:'暂不支持'})[i.classification] || '待确认'}</span>`,
+    renderLibraryDurations(i), `音轨 ${i.missingAudio} · 字幕 ${i.missingSubtitles}`],
+  results:{ pending:'等待补全', completed:'已核验成功' },
+  tally: t => `成功 ${t.completed} · 仍有缺失 ${t.partial} · 失败 / 未核验 ${t.failed} · 跳过 ${t.skipped}`,
+  ready: () => probeReady() && !settingsSaving,
+  // ISO needs the plugin and a readable ffprobe; BDMV in the same scope can still run.
+  plan: items => {
+    const iso = items.filter(i => i.sources?.some(s => s.isIso)).length, blocked = iso > 0 && (!isoStatus?.canProbe || isoLoading);
+    return blocked ? { runnable: items.length - iso, label:`仅补全 BDMV（${items.length - iso} 部）`,
+      note:`所选范围有 ${iso} 部 ISO 暂不提交探测，请先解决上方 ISO 前置检查提示。${items.length - iso ? `可先补全其余 ${items.length - iso} 部 BDMV。` : ''}` } : {};
+  },
+  note: task => !probeReady() ? '检查只读取 Emby 已保存的信息；补全前请开启上方「Emby 探测语言补全」并确认已接入。'
+    : task?.scanComplete ? '计划包含语言缺失、时长缺失和信息不足的原盘；按所选媒体库补全。' : '先检查媒体库，再按计划补全。语言及时长完整的原盘会自动跳过。',
+  beforeFill: async items => {
+    if (!items.some(i => i.sources?.some(s => s.isIso))) return true;
+    await refreshIsoStatus();
+    if (isoStatus?.canProbe || items.some(i => !i.sources?.some(s => s.isIso))) return true;
+    toast(isoStatus?.message || 'ISO 补全前置检查未通过。', true); return false;
+  },
+  onScanFinished: () => refreshIsoStatus().catch(() => {})
+});
+function renderLibraryTask() { renderIsoStatus(); languageBatch.render(); }
 $('#refresh-iso').addEventListener('click',()=>refreshIsoStatus());
-$('#library-filter').addEventListener('change',()=>{libraryPage=0;renderLibraryRows();});
-$('#library-select-all').addEventListener('change',event=>{selectedLibraryIds = new Set(event.currentTarget.checked ? libraryTask.libraries.map(l=>l.id) : []);libraryPage=0;renderLibraryTask();});
-$('#library-groups').addEventListener('change',event=>{const id=event.target.dataset.libraryId;if(id){event.target.checked ? selectedLibraryIds.add(id) : selectedLibraryIds.delete(id);libraryPage=0;renderLibraryTask();}});
-$('#library-prev').addEventListener('click',()=>{libraryPage--;renderLibraryRows();});
-$('#library-next').addEventListener('click',()=>{libraryPage++;renderLibraryRows();});
 async function refreshMediaFeatures() {
   if (mediaFeatureBusy) return;
   const result = await api('media-features');
@@ -559,5 +470,4 @@ action('#probe-media-features',async()=>{
   try { const result=await api('media-features/probe',{itemId:$('#feature-item-id').value.trim()}); output.textContent=result.name+'\n\n'+result.streams.map(s=>`#${s.Index} · ${s.Codec.toUpperCase()} · ${s.Title || s.Profile || '基础规格保留'}${s.Language ? ' · '+s.Language : ''}`).join('\n'); }
   catch(error){output.textContent=error.message;throw error;}
 });
-document.addEventListener('visibilitychange',()=>{clearTimeout(libraryTimer);if(!document.hidden && !$('#console').hidden && location.hash === '#language') refreshLibraryTask().catch(()=>{});});
 startConsole().catch(()=>{});

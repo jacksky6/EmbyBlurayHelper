@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f6f7fb"><title>EmbyBlurayHelper</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%235759df'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='5' fill='white'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script><script src="/media-features.js" defer></script><script src="/chapters.js" defer></script>
+  <link rel="stylesheet" href="/app.css"><script src="/batch.js" defer></script><script src="/app.js" defer></script><script src="/media-features.js" defer></script><script src="/chapters.js" defer></script>
 </head>
 <body>
 <svg class="icon-library" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -115,31 +115,7 @@
      <div class="iso-checks"><span id="iso-plugin-status">插件 · 待检查</span><span id="iso-probe-status">ffprobe · 待检查</span></div>
      <small id="iso-checked-at">安装或更新 DLL 并重启 Emby 后，可点击「重新检查」。</small>
     </div>
-    <div class="library-counts">
-     <div><span>原盘影片</span><strong id="library-disc-count">—</strong><small id="library-movie-count">尚未检查媒体库</small></div>
-     <div><span>信息完整</span><strong id="library-complete-count">—</strong><small>轨道语言及时长均完整</small></div>
-     <div><span>语言缺失</span><strong id="library-missing-count">—</strong><small id="library-track-count">音轨与字幕分别统计</small></div>
-     <div><span>信息不足</span><strong id="library-unknown-count">—</strong><small id="library-runtime-count">需要重新探测后确认</small></div>
-    </div>
-    <div class="library-scope" id="library-scope" hidden>
-     <div class="library-scope-heading"><div><h3>选择媒体库</h3><p>跨库影片只处理一次；可全选，也可仅处理部分媒体库。</p></div><label class="library-select-all"><input type="checkbox" id="library-select-all">全选媒体库</label></div>
-     <div class="log-table-wrap"><table class="log-table library-scope-table"><thead><tr><th>媒体库</th><th>电影</th><th>原盘</th><th>信息完整</th><th>语言缺失</th><th>信息不足</th><th>本次进度</th></tr></thead><tbody id="library-groups"></tbody></table></div>
-     <p class="field-help" id="library-selection-summary"></p>
-    </div>
-    <div class="form-actions library-actions"><button id="library-scan" class="button secondary"><svg><use href="#search"/></svg>检查媒体库</button><button id="library-fill" class="button primary" disabled>补全所选媒体库</button><button id="library-cancel" class="button danger" hidden>停止</button><button id="library-refresh" class="text-button accent"><svg><use href="#refresh"/></svg>刷新进度</button></div>
-    <p class="field-help" id="library-prerequisite">检查只读取 Emby 已保存的信息；补全前请开启上方「Emby 探测语言补全」。</p>
-    <div class="library-progress" id="library-progress" data-state="idle">
-     <div class="library-progress-heading"><strong id="library-task-title">尚未检查</strong><span id="library-task-percent"></span></div>
-     <progress id="library-task-bar" max="1" value="0" aria-label="原盘语言任务进度" hidden></progress>
-     <p id="library-task-message" role="status" aria-live="polite">先检查媒体库，再选择需要补全的原盘。</p><p id="library-current" hidden></p>
-     <div class="library-task-foot"><span id="library-task-counts"></span><span id="library-task-time"></span></div>
-    </div>
-    <p class="error" id="library-error" role="alert" hidden></p>
-    <details class="library-details" id="library-details" hidden><summary>影片与任务明细 <span id="library-detail-count"></span></summary>
-     <div class="library-table-toolbar"><label for="library-filter">显示所选库</label><select id="library-filter"><option value="all">全部原盘</option><option value="pending">待补全</option><option value="issues">失败 / 仍有缺失</option></select><span id="library-table-count"></span></div>
-     <div class="log-table-wrap"><table class="log-table library-table"><thead><tr><th>电影</th><th>信息状态</th><th>时长</th><th>缺失语言</th><th>任务结果</th></tr></thead><tbody id="library-rows"></tbody></table></div>
-     <div class="library-pagination"><button class="button secondary" id="library-prev">上一页</button><span id="library-page"></span><button class="button secondary" id="library-next">下一页</button></div>
-    </details>
+    <div id="library-batch"></div>
     <details class="multiclip-help"><summary>统计和补全如何工作</summary><div>
      <p>按 Emby 媒体库分别统计电影中的 BDMV 文件夹和 Blu-ray ISO，包含 UHD 和 1080p；上方卡片为全部媒体库的去重总计。勾选媒体库后，下方影片明细和补全计划只包含所选范围。同一电影出现在多个库时只提交一次，各库数量不一定能直接相加。</p>
      <p>检查内部音轨、字幕语言，以及每个原盘版本的时长，外部字幕不计入。历史数据不能证明“从未探测”，因此按当前保存的信息是否完整分类。信息不足的文件夹原盘和 ISO 都会加入补全计划。</p>
@@ -190,32 +166,7 @@
    </div>
    <div class="panel settings-panel spaced" id="feature-batch-panel">
     <div class="panel-heading"><span class="feature-icon lavender"><svg><use href="#grid"/></svg></span><div><h2>按媒体库补全规格</h2><p>仅处理 BDMV 文件夹和 Blu-ray ISO，保留原有语言、时长及自定义备注。</p></div></div>
-    <div class="library-counts">
-     <div><span>原盘影片</span><strong id="feature-batch-disc-count">—</strong><small id="feature-batch-formats">BDMV / ISO</small></div>
-     <div><span>批量已核验</span><strong id="feature-batch-verified-count">—</strong><small>包括样本未确认新增规格的影片</small></div>
-     <div><span>待核验</span><strong id="feature-batch-pending-count">—</strong><small>尚无有效的批量核验记录</small></div>
-     <div><span>本次成功</span><strong id="feature-batch-completed-count">—</strong><small id="feature-batch-failures">逐源探测并读回确认</small></div>
-    </div>
-    <div class="library-scope" id="feature-batch-scope" hidden>
-     <div class="library-scope-heading"><div><h3>选择媒体库</h3><p>同一影片跨库只处理一次，普通 MKV / MP4 不进入计划。</p></div><label class="library-select-all"><input id="feature-batch-select-all" type="checkbox">全选媒体库</label></div>
-     <div class="log-table-wrap"><table class="log-table library-scope-table"><thead><tr><th>媒体库</th><th>电影</th><th>BDMV / ISO</th><th>已核验</th><th>待核验</th><th>本次进度</th></tr></thead><tbody id="feature-batch-groups"></tbody></table></div>
-     <p class="field-help" id="feature-batch-selection"></p>
-    </div>
-    <label class="feature-batch-recheck"><input id="feature-batch-recheck" type="checkbox">重新核验已完成的原盘</label>
-    <div class="form-actions library-actions"><button id="feature-batch-scan" class="button secondary"><svg><use href="#search"/></svg>检查媒体库</button><button id="feature-batch-fill" class="button primary" disabled>补全所选媒体库</button><button id="feature-batch-cancel" class="button danger" hidden>停止</button><button id="feature-batch-refresh" class="text-button accent"><svg><use href="#refresh"/></svg>刷新进度</button></div>
-    <p class="field-help" id="feature-batch-prerequisite">检查只读取 Emby 信息；实际补全前需开启上方规格识别。</p>
-    <div class="library-progress" id="feature-batch-progress" data-state="idle">
-     <div class="library-progress-heading"><strong id="feature-batch-title">尚未检查</strong><span id="feature-batch-percent"></span></div>
-     <progress id="feature-batch-bar" max="1" value="0" aria-label="原盘规格批量任务进度" hidden></progress>
-     <p id="feature-batch-message" role="status" aria-live="polite">先检查媒体库，再选择需要补全规格的原盘。</p>
-     <div class="library-task-foot"><span id="feature-batch-counts">任务运行且此页面可见时刷新进度</span><span id="feature-batch-time"></span></div>
-    </div>
-    <p class="error" id="feature-batch-error" role="alert" hidden></p>
-    <details class="library-details" id="feature-batch-details" hidden><summary>影片与规格明细 <span id="feature-batch-detail-count"></span></summary>
-     <div class="library-table-toolbar"><label for="feature-batch-filter">显示所选库</label><select id="feature-batch-filter"><option value="all">全部原盘</option><option value="pending">待核验</option><option value="issues">失败 / 未核验</option></select><span id="feature-batch-table-count"></span></div>
-     <div class="log-table-wrap"><table class="log-table library-table feature-batch-table"><thead><tr><th>影片</th><th>原盘版本 / 规格</th><th>核验状态</th><th>任务结果</th></tr></thead><tbody id="feature-batch-rows"></tbody></table></div>
-     <div class="library-pagination"><button class="button secondary" id="feature-batch-prev">上一页</button><span id="feature-batch-page"></span><button class="button secondary" id="feature-batch-next">下一页</button></div>
-    </details>
+    <div id="feature-batch"></div>
     <details class="multiclip-help"><summary>计划、结果和继续处理</summary><div><p>按媒体库检查电影中的 BDMV、Blu-ray ISO，包含 UHD 和 1080p。一个电影有多个版本时，仅处理其中的原盘媒体源。首次批量检查可能再次核验之前手动或自动处理过的影片，不根据是否已有 DV / Atmos 判断是否完成。</p><p>默认仅处理尚无有效批量核验记录的原盘；无新增规格的正常结果也会保存，避免每次重复处理。增强探测失败或保存核验失败不计为完成。勾选「重新核验已完成」可重新处理选定媒体库；引擎更新或保存的媒体信息变化后，重新检查会建立新的待核验计划。</p><p>任务在后台逐源执行，切换页面或关闭浏览器仍会继续。可停止并继续未完成的部分；已提交给 Emby 的当前探测可能仍会保存。进度保存在工具数据目录，详细日志位于 MediaFeatureBatch。它不刷新影片标题、简介或图片。</p></div></details>
    </div>
    <div class="panel settings-panel spaced"><div class="panel-heading"><span class="feature-icon mint"><svg><use href="#search"/></svg></span><div><h2>核验已有影片</h2><p>已有原盘可单独补全规格；保留原有语言、时长、轨道顺序和自定义备注。</p></div></div><label for="feature-item-id">Emby 影片 ID</label><input id="feature-item-id" type="text" inputmode="numeric" placeholder="例如 5"><div class="form-actions"><button id="probe-media-features" class="button secondary">识别并保存规格</button></div><pre class="result" id="feature-item-result" hidden></pre></div>
@@ -231,13 +182,7 @@
    </div>
    <div class="panel settings-panel spaced">
     <div class="panel-heading"><span class="feature-icon mint"><svg><use href="#grid"/></svg></span><div><h2>按媒体库补全章节</h2><p>替换缺失或 Emby 自动生成的等间隔章节，保留已有自定义章节与片头片尾标记。</p></div></div>
-    <div class="library-counts"><div><span>原盘影片</span><strong id="chapter-total">—</strong><small>仅 BDMV / Blu-ray ISO</small></div><div><span>已补全</span><strong id="chapter-verified">—</strong><small>由工具保存并读回核验</small></div><div><span>待补全</span><strong id="chapter-pending">—</strong><small>章节缺失或等间隔生成</small></div><div><span>已有章节</span><strong id="chapter-preserved">—</strong><small>非等间隔或自定义，保留</small></div></div>
-    <div class="library-scope" id="chapter-scope" hidden><div class="library-scope-heading"><div><h3>选择媒体库</h3><p>跨库影片只处理一次；可全选，也可仅处理部分媒体库。</p></div><label class="library-select-all"><input id="chapter-select-all" type="checkbox">全选媒体库</label></div><div class="log-table-wrap"><table class="log-table library-scope-table"><thead><tr><th>媒体库</th><th>电影</th><th>原盘</th><th>已补全</th><th>待补全</th><th>已有章节</th></tr></thead><tbody id="chapter-groups"></tbody></table></div></div>
-    <label class="feature-batch-recheck"><input type="checkbox" id="chapter-recheck">重新核验已完成的原盘（仍保留自定义章节）</label>
-    <div class="form-actions library-actions"><button id="chapter-scan" class="button secondary"><svg><use href="#search"/></svg>检查媒体库</button><button id="chapter-fill" class="button primary" disabled>补全所选媒体库</button><button id="chapter-cancel" class="button danger" hidden>停止</button><button id="chapter-progress-refresh" class="text-button accent"><svg><use href="#refresh"/></svg>刷新进度</button></div>
-    <div class="library-progress" id="chapter-progress"><div class="library-progress-heading"><strong id="chapter-task-title">尚未检查</strong><span id="chapter-progress-count"></span></div><progress id="chapter-bar" max="1" value="0" aria-label="原盘章节任务进度" hidden></progress><p id="chapter-message" role="status" aria-live="polite">先检查媒体库，再选择需要补全的原盘。</p><div class="library-task-foot"><span id="chapter-task-counts">仅任务运行且页面可见时刷新进度</span></div></div>
-    <p class="error" id="chapter-error" role="alert" hidden></p>
-    <details class="library-details" id="chapter-details" hidden><summary>影片章节明细</summary><div class="log-table-wrap"><table class="log-table library-table"><thead><tr><th>影片</th><th>原盘与章节</th><th>处理结果</th></tr></thead><tbody id="chapter-rows"></tbody></table></div><div class="library-pagination"><button class="button secondary" id="chapter-prev">上一页</button><span id="chapter-page"></span><button class="button secondary" id="chapter-next">下一页</button></div></details>
+    <div id="chapter-batch"></div>
    </div>
     <div class="panel settings-panel spaced"><h2>原盘截图 · 跟随 Emby 设置</h2><p class="muted">截图开关、触发时机、截图间隔和保存位置，均读取 Emby 对应媒体库的「生成视频预览缩略图」设置，无需在这里重复配置。</p><p id="chapter-thumbnail-state" class="field-help" role="status" aria-live="polite">进入页面时读取 Emby 截图状态。</p><div class="log-table-wrap"><table class="log-table library-scope-table"><thead><tr><th>媒体库</th><th>提取时机</th><th>截图方式</th><th>保存位置</th></tr></thead><tbody id="chapter-thumbnail-libraries"></tbody></table></div><details class="multiclip-help"><summary>工作方式</summary><div><p>从不：不提取。作为计划任务：Emby 内置提取任务完成后，自动运行「原盘章节截图（跟随 Emby）」；可在 Emby 计划任务中查看进度、停止或手动重试，无需另设定时计划。作为计划任务及添加媒体时：还会在原盘元数据扫描时提取。</p><p class="field-help">间隔选择「章节标记」时保存章节 JPEG；选择秒数时生成 BIF，供章节图片读取。Emby 4.10 的原盘拖动预览接口仍有限制，不能据 BIF 已生成判断拖动预览可用。截图使用 Emby 原版 ffmpeg；ISO 按需读取，不整盘解压或修改原片。已有图片保留，关闭后不删除。</p><p class="field-help">HDR / 兼容杜比视界底层经过 HDR → SDR 色调映射；无法正确映射时跳过并记录原因，避免偏色。需要 Emby 插件 0.1.6 和新版 Helper；读取器路径与章节补全共用，截图开关独立遵循 Emby。详细日志位于 Emby 的 DiscThumbnails。</p></div></details></div>
   </section>

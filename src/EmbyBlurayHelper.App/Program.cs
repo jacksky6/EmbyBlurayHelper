@@ -201,7 +201,7 @@ app.Use(async (context, next) =>
     }
 });
 
-foreach (var (route, name, type) in new[] { ("/", "index.html", "text/html; charset=utf-8"), ("/app.css", "app.css", "text/css"), ("/app.js", "app.js", "text/javascript"), ("/media-features.js", "media-features.js", "text/javascript"), ("/chapters.js", "chapters.js", "text/javascript") })
+foreach (var (route, name, type) in new[] { ("/", "index.html", "text/html; charset=utf-8"), ("/app.css", "app.css", "text/css"), ("/batch.js", "batch.js", "text/javascript"), ("/app.js", "app.js", "text/javascript"), ("/media-features.js", "media-features.js", "text/javascript"), ("/chapters.js", "chapters.js", "text/javascript") })
     app.MapGet(route, () => Results.Stream(Assembly.GetExecutingAssembly().GetManifestResourceStream("EmbyBlurayHelper.App.Web." + name)!, type));
 app.MapPost("/api/login", async (LoginInput input, HttpContext context) =>
 {
