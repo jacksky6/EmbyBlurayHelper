@@ -43,13 +43,14 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
         if (chapterMetadata && response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == "application/json" && !HttpMethods.IsHead(context.Request.Method))
         {
             var original = await response.Content.ReadAsByteArrayAsync(context.RequestAborted);
-            var changed = chapterProxy.RewriteMetadata(context, original);
+            var changed = await chapterProxy.RewriteMetadataAsync(context, original);
             var output = changed ?? original;
             if (changed is not null) { context.Response.Headers.Remove("ETag"); context.Response.Headers.Remove("Content-Encoding"); context.Response.Headers.Remove("Content-MD5"); context.Response.Headers.CacheControl = "no-store"; }
             context.Response.ContentLength = output.Length;
             await context.Response.Body.WriteAsync(output, context.RequestAborted);
             return;
         }
+        if (chapterMetadata) chapterProxy.LogUnchanged(context, (int)response.StatusCode, response.Content.Headers.ContentType?.MediaType);
         if (!HttpMethods.IsHead(context.Request.Method))
             await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
     }

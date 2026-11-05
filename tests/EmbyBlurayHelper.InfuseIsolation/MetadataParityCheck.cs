@@ -25,7 +25,7 @@ internal static class MetadataParityCheck
         var user = users.RootElement.EnumerateArray().First(u => u.GetProperty("Policy").GetProperty("IsAdministrator").GetBoolean()).GetProperty("Id").GetString();
         using var donor = JsonDocument.Parse(await client.GetStringAsync(upstream + "/Items?Ids=12&Fields=MediaSources,Chapters,Path"));
         using var cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 128 });
-        var production = new InfuseChapterProxy(new ProxyConfiguration { EnableInfuseChapters = true }, client, cache, NullLogger.Instance);
+        var production = new InfuseChapterProxy(new ProxyConfiguration { EnableInfuseChapters = true, UpstreamBaseUrl = upstream }, client, cache, NullLogger.Instance);
         var isolation = new NativeIsoMetadata(donor.RootElement.GetProperty("Items")[0], DiscChapterPresentation.Create);
         var routes = new[]
         {
@@ -40,21 +40,21 @@ internal static class MetadataParityCheck
             using var request = new HttpRequestMessage(HttpMethod.Get, upstream + route);
             using var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
-            Compare(route, await response.Content.ReadAsByteArrayAsync(), "GET");
+            await Compare(route, await response.Content.ReadAsByteArrayAsync(), "GET");
         }
         var postRoute = $"/Items/12/PlaybackInfo?UserId={user}";
         using var posted = await client.PostAsync(upstream + postRoute, new StringContent("{\"IsPlayback\":false}", System.Text.Encoding.UTF8, "application/json"));
         posted.EnsureSuccessStatusCode();
-        Compare(postRoute, await posted.Content.ReadAsByteArrayAsync(), "POST");
+        await Compare(postRoute, await posted.Content.ReadAsByteArrayAsync(), "POST");
 
-        void Compare(string route, byte[] original, string method)
+        async Task Compare(string route, byte[] original, string method)
         {
             var endpoint = new Uri(upstream + route);
             var context = new DefaultHttpContext();
             context.Request.Path = endpoint.AbsolutePath;
             context.Request.QueryString = new QueryString(endpoint.Query);
             context.Request.Method = method;
-            var actual = production.RewriteMetadata(context, original);
+            var actual = await production.RewriteMetadataAsync(context, original);
             var expected = isolation.Rewrite(endpoint.AbsolutePath, original);
             if (actual is null || expected is null) throw new Exception("Expected both virtual ISO metadata transformations.");
             var actualJson = JsonNode.Parse(actual);

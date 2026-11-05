@@ -17,57 +17,138 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
     private static readonly Regex MetadataRoute = new("^(?:/emby)?/(?:Items/[^/]+/PlaybackInfo|(?:Users/[^/]+/)?Items(?:/[^/]+)?)/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     internal bool IsMetadata(HttpContext context) => config.EnableInfuseChapters && EmbyProxy.IsInfuse(context.Request) && MetadataRoute.IsMatch(context.Request.Path);
 
-    internal byte[]? RewriteMetadata(HttpContext context, byte[] bytes)
+    // Infuse keeps the item format from whichever list or detail response it
+    // synced last, and those responses carry different fields. Decide every
+    // disc item from the same Emby lookup the stream route uses, never from
+    // whether this particular response happened to include sources or chapters.
+    internal async Task<byte[]?> RewriteMetadataAsync(HttpContext context, byte[] bytes)
     {
-        if (bytes.Length > 8 * 1024 * 1024) return null;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        if (bytes.Length > 8 * 1024 * 1024) { LogMetadata(context, "skipped-too-large", 0, [], [], clock); return null; }
         JsonNode? root;
-        try { root = JsonNode.Parse(bytes); } catch (JsonException) { return null; }
-        var changed = false;
-        if (root is JsonObject obj)
+        try { root = JsonNode.Parse(bytes); } catch (JsonException) { LogMetadata(context, "skipped-not-json", 0, [], [], clock); return null; }
+        var items = root switch
         {
-            if (obj["Items"] is JsonArray items)
-            {
-                foreach (var item in items.OfType<JsonObject>()) changed |= RewriteItem(context, item);
-            }
-            else changed = RewriteItem(context, obj);
+            JsonObject obj when obj["Items"] is JsonArray list => list.OfType<JsonObject>().ToList(),
+            JsonObject obj => [obj],
+            JsonArray list => list.OfType<JsonObject>().ToList(),
+            _ => []
+        };
+        var candidates = new List<(JsonObject Item, string Id)>();
+        foreach (var item in items)
+        {
+            var id = Text(item["Id"]) ?? Regex.Match(context.Request.Path, "(?i)/Items/([^/]+)").Groups[1].Value;
+            var sources = item["MediaSources"] as JsonArray;
+            var disc = string.Equals(Text(item["Container"]), "bluray", StringComparison.OrdinalIgnoreCase) ||
+                sources?.OfType<JsonObject>().Any(s => string.Equals(Text(s["Container"]), "bluray", StringComparison.OrdinalIgnoreCase)) == true;
+            if (disc && !string.IsNullOrEmpty(id)) candidates.Add((item, id));
         }
-        else if (root is JsonArray items)
-            foreach (var item in items.OfType<JsonObject>()) changed |= RewriteItem(context, item);
-        return changed ? Encoding.UTF8.GetBytes(root!.ToJsonString()) : null;
+        var rewritten = new List<string>(); var unresolved = new List<string>();
+        if (candidates.Count > 0)
+        {
+            var canonical = await CanonicalSourcesAsync(context, candidates.Select(c => c.Id).Distinct().ToArray());
+            foreach (var (item, id) in candidates)
+                if (canonical is not null && canonical.TryGetValue(id, out var known) && RewriteItem(context, item, id, known)) rewritten.Add(id);
+                else unresolved.Add(id);
+        }
+        LogMetadata(context, rewritten.Count > 0 ? "rewritten" : "unchanged", items.Count, rewritten, unresolved, clock);
+        return rewritten.Count > 0 ? Encoding.UTF8.GetBytes(root!.ToJsonString()) : null;
     }
 
-    private bool RewriteItem(HttpContext context, JsonObject obj)
+    private bool RewriteItem(HttpContext context, JsonObject obj, string itemId, IReadOnlyDictionary<string, (DiscChapterPresentation? Presentation, string Path)> known)
     {
-        if (obj["MediaSources"] is not JsonArray sources) return false;
-        var itemId = obj["Id"]?.GetValue<string>() ?? Regex.Match(context.Request.Path, "(?i)/Items/([^/]+)").Groups[1].Value;
-        if (string.IsNullOrEmpty(itemId)) return false;
         var changed = false;
-        foreach (var source in sources.OfType<JsonObject>())
+        foreach (var source in (obj["MediaSources"] as JsonArray)?.OfType<JsonObject>() ?? [])
         {
-            var presentation = Build(source.Deserialize<JsonElement>());
-            var sourceId = source["Id"]?.GetValue<string>();
-            if (presentation is null || string.IsNullOrEmpty(sourceId)) continue;
-            source["Container"] = "blurayiso"; source["Size"] = presentation.Image.Length;
-            var originalPath = source["Path"]?.GetValue<string>() ?? "";
-            var separator = originalPath.Contains('\\') ? '\\' : '/';
-            source["Path"] = originalPath.TrimEnd('/', '\\') + separator + "EmbyBlurayHelper.iso";
+            var sourceId = Text(source["Id"]);
+            if (sourceId is null || !known.TryGetValue(sourceId, out var match) || match.Presentation is null) continue;
+            source["Container"] = "blurayiso"; source["Size"] = match.Presentation.Image.Length; source["Path"] = IsoPath(match.Path);
             // Preserve native media-source hints. Infuse can select a different
             // reader when extra URL/MIME hints are injected into the DTO. The
             // authenticated stream route supplies the explicit ISO redirect.
             source["SupportsDirectPlay"] = true; source["SupportsDirectStream"] = true;
-            // Infuse can retain item-level information from a library listing.
-            // Describe one consistent file at both levels, rather than an ISO
-            // media source inside an item still advertised as a BDMV folder.
-            if (sources.Count == 1)
-            {
-                if (obj.ContainsKey("Container")) obj["Container"] = "blurayiso";
-                if (obj["Path"]?.GetValue<string>() == originalPath) obj["Path"] = source["Path"]!.DeepClone();
-                if (obj.ContainsKey("Size")) obj["Size"] = presentation.Image.Length;
-            }
+            changed = true;
+        }
+        // Infuse can retain item-level information from a library listing.
+        // Describe one consistent file at both levels, rather than an ISO
+        // media source inside an item still advertised as a BDMV folder.
+        if (known.Count == 1 && known.Values.Single() is { Presentation: { } presentation } single)
+        {
+            if (obj.ContainsKey("Container")) obj["Container"] = "blurayiso";
+            if (Text(obj["Path"]) == single.Path) obj["Path"] = IsoPath(single.Path);
+            if (obj.ContainsKey("Size")) obj["Size"] = presentation.Image.Length;
             changed = true;
             logger.LogInformation("Infuse chapters: item {ItemId}; {Count} saved Emby chapters in virtual ISO, playlist {Playlist}, navigation {Bytes} bytes; original media is read on demand; metadata route {Route}.", itemId, presentation.ChapterCount, presentation.Playlist, presentation.Image.MetadataBytes, context.Request.Path.Value);
         }
         return changed;
+    }
+
+    private async Task<Dictionary<string, Dictionary<string, (DiscChapterPresentation? Presentation, string Path)>>?> CanonicalSourcesAsync(HttpContext context, string[] ids)
+    {
+        try
+        {
+            using var request = EmbyProxy.CreateRequest(context, new Uri(config.UpstreamBaseUrl.TrimEnd('/') + "/emby/Items?Ids=" + Uri.EscapeDataString(string.Join(',', ids)) + "&Fields=MediaSources,Chapters" + CallerQuery(context)), "GET", false);
+            request.Headers.Remove("Range"); request.Headers.AcceptEncoding.Clear(); request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+            if (!response.IsSuccessStatusCode) { logger.LogWarning("Infuse chapters: catalog lookup returned {Status}; forwarding original metadata.", (int)response.StatusCode); return null; }
+            await using var body = await response.Content.ReadAsStreamAsync(context.RequestAborted);
+            using var document = await JsonDocument.ParseAsync(body, cancellationToken: context.RequestAborted);
+            var builds = new List<(string Item, string Source, string Path, Task<DiscChapterPresentation?> Task)>();
+            using var throttle = new SemaphoreSlim(4);
+            if (!document.RootElement.TryGetProperty("Items", out var list)) return [];
+            foreach (var item in list.EnumerateArray())
+            {
+                if (item.TryGetProperty("Id", out var itemId) && item.TryGetProperty("MediaSources", out var sources))
+                    foreach (var source in sources.EnumerateArray())
+                    {
+                        if (!source.TryGetProperty("Id", out var sourceId)) continue;
+                        var copy = source.Clone();
+                        builds.Add((itemId.GetString()!, sourceId.GetString()!, copy.TryGetProperty("Path", out var path) ? path.GetString() ?? "" : "", Task.Run(async () =>
+                        {
+                            await throttle.WaitAsync(context.RequestAborted);
+                            try { return Build(copy); } finally { throttle.Release(); }
+                        })));
+                    }
+            }
+            await Task.WhenAll(builds.Select(b => b.Task));
+            return builds.GroupBy(b => b.Item).ToDictionary(g => g.Key, g => g.ToDictionary(b => b.Source, b => (b.Task.Result, b.Path)));
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException or InvalidOperationException or ArgumentException ||
+            e is TaskCanceledException && !context.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogWarning("Infuse chapters: catalog lookup failed ({ErrorType}); forwarding original metadata.", e.GetType().Name);
+            return null;
+        }
+    }
+
+    private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+    private static string IsoPath(string source) => source.TrimEnd('/', '\\') + (source.Contains('\\') ? '\\' : '/') + "EmbyBlurayHelper.iso";
+
+    // Upstream checks run with the caller's own Emby credentials, never the
+    // management API key.
+    private static string CallerQuery(HttpContext context)
+    {
+        var query = "";
+        foreach (var name in new[] { "api_key", "X-Emby-Token", "X-Emby-Authorization", "UserId" })
+            if (!string.IsNullOrEmpty(context.Request.Query[name])) query += "&" + name + "=" + Uri.EscapeDataString(context.Request.Query[name].ToString());
+        return query;
+    }
+
+    // One diagnostic line per Infuse metadata response. Only route, query key
+    // names and the Fields list are logged; never tokens or other values.
+    private void LogMetadata(HttpContext context, string result, int items, List<string> rewritten, List<string> unresolved, System.Diagnostics.Stopwatch clock) =>
+        logger.LogInformation("Infuse metadata: {Method} {Route}; query keys {Keys}; fields {Fields}; result {Result}; {Items} items; disc items rewritten [{Rewritten}]; unresolved [{Unresolved}]; elapsed {Elapsed} ms.",
+            context.Request.Method, context.Request.Path.Value, QueryKeys(context), Fields(context), result, items, string.Join(",", rewritten.Take(20)), string.Join(",", unresolved.Take(20)), clock.ElapsedMilliseconds);
+
+    internal void LogUnchanged(HttpContext context, int status, string? contentType) =>
+        logger.LogInformation("Infuse metadata: {Method} {Route}; query keys {Keys}; fields {Fields}; result not-rewritable; status {Status}; type {Type}.",
+            context.Request.Method, context.Request.Path.Value, QueryKeys(context), Fields(context), status, contentType ?? "none");
+
+    private static string QueryKeys(HttpContext context) => string.Join(",", context.Request.Query.Keys.Where(k => Regex.IsMatch(k, "^[A-Za-z0-9_.-]{1,40}$")).Order(StringComparer.OrdinalIgnoreCase));
+    private static string Fields(HttpContext context)
+    {
+        var fields = context.Request.Query["Fields"].ToString();
+        return fields.Length == 0 ? "none" : Regex.IsMatch(fields, "^[A-Za-z0-9,]{1,400}$") ? fields : "unrecognized";
     }
 
     private DiscChapterPresentation? Build(JsonElement source)
@@ -80,7 +161,9 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
             if (presentation is not null) cache.Set(key, presentation, new MemoryCacheEntryOptions { Size = Math.Max(1, (presentation.Image.MetadataBytes + 1048575) / 1048576), AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1) });
             return presentation;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or OverflowException or JsonException or IndexOutOfRangeException)
+        // InvalidDataException carries "keep the original playback" decisions
+        // (no matching title, ambiguous branches); it must not fail the request.
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or OverflowException or JsonException or IndexOutOfRangeException or InvalidDataException or KeyNotFoundException or InvalidOperationException)
         {
             logger.LogWarning("Infuse chapters: presentation unavailable ({ErrorType}); forwarding original playback information.", e.GetType().Name);
             return null;
@@ -129,9 +212,7 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         // including cache hits. Never substitute the management API key.
         var sourceId = context.Request.Query["MediaSourceId"].ToString();
         trace.Phase = "item-authorization";
-        var query = "?Ids=" + Uri.EscapeDataString(itemId) + "&Fields=MediaSources,Chapters";
-        foreach (var name in new[] { "api_key", "X-Emby-Token", "X-Emby-Authorization", "UserId" })
-            if (!string.IsNullOrEmpty(context.Request.Query[name])) query += "&" + name + "=" + Uri.EscapeDataString(context.Request.Query[name].ToString());
+        var query = "?Ids=" + Uri.EscapeDataString(itemId) + "&Fields=MediaSources,Chapters" + CallerQuery(context);
         using var request = EmbyProxy.CreateRequest(context, new Uri(config.UpstreamBaseUrl.TrimEnd('/') + "/emby/Items" + query), "GET", false);
         request.Headers.Remove("Range"); request.Headers.AcceptEncoding.Clear(); request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);

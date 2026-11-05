@@ -49,6 +49,20 @@ internal static class RemoteDiscCheck
             var listedSource=item.GetProperty("MediaSources")[0];
             if(listedSource.GetProperty("Container").GetString()!="blurayiso"||item.GetProperty("Container").GetString()!="blurayiso"||item.GetProperty("Path").GetString()!=listedSource.GetProperty("Path").GetString())throw new Exception("Library listing and playback source disagree about virtual ISO format or path.");
         }
+        // Library syncs request varying fields. Every shape that names the
+        // format must name the same ISO file the stream route serves.
+        foreach(var fields in new[]{"Path,Container","Path,MediaSources","Path,MediaStreams","Path,Container,Chapters"})
+        using(var listing=JsonDocument.Parse(await client.GetStringAsync("/Items?Ids="+itemId+"&Fields="+fields)))
+        {
+            var item=listing.RootElement.GetProperty("Items")[0];
+            var sizes=new List<long>();if(item.TryGetProperty("Size",out var size))sizes.Add(size.GetInt64());
+            if(item.GetProperty("Container").GetString()!="blurayiso"||!item.GetProperty("Path").GetString()!.EndsWith("EmbyBlurayHelper.iso",StringComparison.Ordinal))
+                throw new Exception("Library listing with Fields="+fields+" still advertises the BDMV folder.");
+            if(item.TryGetProperty("MediaSources",out var listed))
+                foreach(var s in listed.EnumerateArray()){if(s.GetProperty("Container").GetString()!="blurayiso")throw new Exception("Listed source with Fields="+fields+" is not ISO.");sizes.Add(s.GetProperty("Size").GetInt64());}
+            if(sizes.Any(s=>s!=presentation.Image.Length))throw new Exception("Library listing with Fields="+fields+" reports a size other than the served image.");
+        }
+        Console.WriteLine("PASS: library listings with and without media sources or chapters all advertise the served virtual ISO.");
         using(var posted=await client.PostAsync("/Items/"+itemId+"/PlaybackInfo",new StringContent("{\"IsPlayback\":false}",System.Text.Encoding.UTF8,"application/json")))
         using(var json=JsonDocument.Parse(await posted.Content.ReadAsStringAsync()))
             if(json.RootElement.GetProperty("MediaSources")[0].GetProperty("Container").GetString()!="blurayiso")throw new Exception("POST playback metadata not rewritten.");
