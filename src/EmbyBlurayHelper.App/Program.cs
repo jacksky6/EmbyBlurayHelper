@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using EmbyBlurayHelper;
 using EmbyBlurayHelper.App;
 using EmbyBlurayHelper.ProbeWrapper;
 using EmbyBlurayHelper.Proxy;
@@ -69,18 +70,18 @@ if (!serve && !maintenance)
         {
             var probeStore = new SettingsStore(dataDirectory);
             probeLog = new HelperLog(probeStore.DataDirectory);
-            probeSettings = new ProbeSettings(probeStore.Current.UpstreamProbePath, probeStore.Current.EnableProbeLanguagePatch,
-                probeStore.Current.EnableMediaFeatures, probeStore.Current.FeatureProbePath);
+            probeSettings = ProbeSettings.From(probeStore.Current);
         }
         var upstream = probeSettings.UpstreamProbePath;
         if (string.IsNullOrWhiteSpace(upstream)) upstream = await ProbeConfiguration.ResolveUpstreamPathAsync(cancel.Token);
         if (Path.GetFullPath(upstream) == Environment.ProcessPath || Path.GetFullPath(upstream) == ProbeSettings.ExecutablePath) throw new InvalidOperationException("原版 ffprobe 路径指向了本工具。");
         var probeArgs = args[0] == "--check-upstream" ? new[] { "-version" } : args[0] == "--probe" ? args[1..] : args;
-        var features = new MediaFeatureOptions(probeSettings.EnableMediaFeatures, probeSettings.FeatureProbePath);
+        var scopeAllowed = LibraryPathScope.Allowed(probeSettings.ExcludedLibraryPaths ?? [], BluRayLanguageAugmenter.GetMediaInput(probeArgs));
+        var features = new MediaFeatureOptions(scopeAllowed && probeSettings.EnableMediaFeatures, probeSettings.FeatureProbePath);
         if (features.Enabled && !string.IsNullOrWhiteSpace(features.ProbePath) &&
             string.Equals(Path.GetFullPath(upstream), Path.GetFullPath(features.ProbePath), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             features = features with { Enabled = false };
-        var exit = await ProbeProcess.RunAsync(upstream, probeArgs, cancel.Token, probeSettings.EnableProbeLanguagePatch, features);
+        var exit = await ProbeProcess.RunAsync(upstream, probeArgs, cancel.Token, scopeAllowed && probeSettings.EnableProbeLanguagePatch, features);
         probeLog?.Add(exit == 0 ? "Information" : "Warning", "Probe", $"媒体探测完成，退出码 {exit}，语言补全{(probeSettings.EnableProbeLanguagePatch ? "已启用" : "已关闭")}。");
         return exit;
     }
@@ -137,6 +138,7 @@ builder.Services.AddMemoryCache(options => options.SizeLimit = 128);
 using var mediaClient = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.None }) { Timeout = Timeout.InfiniteTimeSpan };
 using var apiClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
 var integration = new EmbyIntegration(settings, apiClient, log);
+var libraryScope = new LibraryScopeService(settings, apiClient, log);
 using var libraryClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 var mediaFeatures = new MediaFeatureService(settings, integration, libraryClient, log);
 await using var featureBatch = new MediaFeatureBatch(settings, libraryClient, log, mediaFeatures.ProbeSource);
@@ -145,7 +147,19 @@ var chapters = new NativeChapterService(settings, libraryClient, log);
 await using var chapterBatch = new NativeChapterBatch(settings, libraryClient, chapters, log);
 // Disposed before the three tasks it chains.
 await using var pipeline = new LibraryPipeline(libraryTask, featureBatch, chapterBatch, log);
+using var libraryOperationGate = new SemaphoreSlim(1, 1);
+async Task<T> LibraryOperation<T>(Func<Task<T>> action, CancellationToken token)
+{
+    await libraryOperationGate.WaitAsync(token);
+    try { return await action(); }
+    finally { libraryOperationGate.Release(); }
+}
 var app = builder.Build();
+if (settings.Current.EmbyApiKey.Length > 0 && settings.Current.ExcludedLibrariesByServer.Count > 0)
+{
+    try { await libraryScope.Prepare(CancellationToken.None); }
+    catch (Exception e) { log.Add("Warning", "LibraryScope", "启动时无法同步媒体库范围，请在全局设置中重新读取：" + HelperLog.Redact(e.Message)); }
+}
 app.UseWebSockets();
 var proxies = new Dictionary<ProxyConfiguration, EmbyProxy>();
 var proxyGate = new object();
@@ -240,12 +254,26 @@ app.MapGet("/api/settings", () => new { settings = settings.Current, hasApiKey =
 app.MapPost("/api/settings", async (HelperSettings input, CancellationToken token) =>
 {
     SettingsStore.Validate(input);
+    var connectionChanged = SettingsStore.Connection(input) != SettingsStore.Connection(settings.Current);
     await integration.SaveSettings(input, token);
+    if (connectionChanged && settings.Current.ExcludedLibrariesByServer.Count > 0)
+    {
+        try { await libraryScope.Prepare(token); }
+        catch (Exception e) { log.Add("Warning", "LibraryScope", "连接已保存，但处理范围尚未同步，请在全局设置中重新读取并保存：" + HelperLog.Redact(e.Message)); }
+    }
     if (app.Services.GetRequiredService<IMemoryCache>() is MemoryCache cache) cache.Compact(1);
     log.Add("Information", "Settings", "配置已保存。功能开关与 Emby 地址立即生效；监听端口变更需重新启动工具。");
     return Results.Ok(new { restartRequired = settings.RestartRequired });
 });
 app.MapGet("/api/status", () => log.Status());
+app.MapGet("/api/library-scope", (CancellationToken token) => libraryScope.Read(token));
+app.MapGet("/library-scope.js", () => Results.Stream(Assembly.GetExecutingAssembly().GetManifestResourceStream("EmbyBlurayHelper.App.Web.library-scope.js")!, "text/javascript"));
+app.MapPost("/api/library-scope", (LibraryScopeInput input, CancellationToken token) => LibraryOperation(async () => {
+    if (libraryTask.State.Active || featureBatch.State.Active || chapterBatch.State.Active || pipeline.Active)
+        throw new InvalidOperationException("媒体库检查或补全任务正在运行，请等待完成或停止后再修改全局范围。");
+    return await libraryScope.Save(input, token);
+}, token));
+app.MapPost("/api/library-scope/refresh", (CancellationToken token) => LibraryOperation(() => libraryScope.Prepare(token), token));
 app.MapGet("/api/logs", () => log.Entries());
 app.MapPost("/api/logs/clear", () => Results.Ok(new { deletedFiles = log.Clear(), message = "全部运行日志已清除。" }));
 app.MapGet("/api/logs/download", () => Results.File(Encoding.UTF8.GetBytes(string.Join('\n', log.Entries().Select(e => $"{e.Time:O} [{e.Level}] {e.Source}: {e.Message}"))), "text/plain; charset=utf-8", "EmbyBlurayHelper.log"));
@@ -266,8 +294,8 @@ app.MapPost("/api/probe/apply", (CancellationToken token) => integration.ApplyPr
 app.MapPost("/api/probe/restore", (CancellationToken token) => integration.ApplyProbe(true, token));
 app.MapGet("/api/library-language", () => libraryTask.Snapshot());
 app.MapGet("/api/iso/status", (CancellationToken token) => libraryTask.CheckIsoPrerequisites(token));
-app.MapPost("/api/library-language/scan", () => Results.Json(libraryTask.Scan(), statusCode: 202));
-app.MapPost("/api/library-language/fill", (LibraryPlanInput input) => Results.Json(libraryTask.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202));
+app.MapPost("/api/library-language/scan", (CancellationToken token) => LibraryOperation(async () => { await libraryScope.Prepare(token); return Results.Json(libraryTask.Scan(), statusCode: 202); }, token));
+app.MapPost("/api/library-language/fill", (LibraryPlanInput input, CancellationToken token) => LibraryOperation(() => Task.FromResult(Results.Json(libraryTask.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202)), token));
 app.MapPost("/api/library-language/cancel", () => libraryTask.Cancel());
 app.MapPost("/api/disc/check", (DiscInput input, HttpContext context) => integration.Inspect(input.ItemId, context.RequestAborted));
 app.MapGet("/api/media-features", (CancellationToken token) => mediaFeatures.Status(token));
@@ -275,18 +303,18 @@ app.MapPost("/api/media-features", (MediaFeatureInput input, CancellationToken t
 app.MapPost("/api/media-features/check", async (FeatureProbeInput input, CancellationToken token) => new { version = await MediaFeatureService.CheckEngine(input.ProbePath, token) });
 app.MapPost("/api/media-features/probe", (DiscInput input, CancellationToken token) => mediaFeatures.Probe(input.ItemId, token));
 app.MapGet("/api/media-features/batch", () => featureBatch.Snapshot());
-app.MapPost("/api/media-features/batch/scan", () => Results.Json(featureBatch.Scan(), statusCode: 202));
-app.MapPost("/api/media-features/batch/fill", (FeatureBatchInput input) => Results.Json(featureBatch.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202));
+app.MapPost("/api/media-features/batch/scan", (CancellationToken token) => LibraryOperation(async () => { await libraryScope.Prepare(token); return Results.Json(featureBatch.Scan(), statusCode: 202); }, token));
+app.MapPost("/api/media-features/batch/fill", (FeatureBatchInput input, CancellationToken token) => LibraryOperation(() => Task.FromResult(Results.Json(featureBatch.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202)), token));
 app.MapPost("/api/media-features/batch/cancel", () => featureBatch.Cancel());
 app.MapGet("/api/chapters", (CancellationToken token) => chapters.Status(token));
 app.MapPost("/api/chapters", (ChapterSettingsInput input, CancellationToken token) => chapters.Configure(input.Enabled, input.ReaderPath, token));
 app.MapGet("/api/chapters/batch", () => chapterBatch.Snapshot());
 app.MapGet("/api/library-tasks", () => pipeline.Snapshot());
-app.MapPost("/api/library-tasks/scan", () => Results.Json(pipeline.ScanAll(), statusCode: 202));
-app.MapPost("/api/library-tasks/fill", (LibraryTasksInput input) => Results.Json(pipeline.Start(input.LibraryIds ?? [], input.Steps ?? []), statusCode: 202));
+app.MapPost("/api/library-tasks/scan", (CancellationToken token) => LibraryOperation(async () => { await libraryScope.Prepare(token); return Results.Json(pipeline.ScanAll(), statusCode: 202); }, token));
+app.MapPost("/api/library-tasks/fill", (LibraryTasksInput input, CancellationToken token) => LibraryOperation(() => Task.FromResult(Results.Json(pipeline.Start(input.LibraryIds ?? [], input.Steps ?? []), statusCode: 202)), token));
 app.MapPost("/api/library-tasks/cancel", () => pipeline.Cancel());
-app.MapPost("/api/chapters/batch/scan", () => Results.Json(chapterBatch.Scan(), statusCode: 202));
-app.MapPost("/api/chapters/batch/fill", (FeatureBatchInput input) => Results.Json(chapterBatch.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202));
+app.MapPost("/api/chapters/batch/scan", (CancellationToken token) => LibraryOperation(async () => { await libraryScope.Prepare(token); return Results.Json(chapterBatch.Scan(), statusCode: 202); }, token));
+app.MapPost("/api/chapters/batch/fill", (FeatureBatchInput input, CancellationToken token) => LibraryOperation(() => Task.FromResult(Results.Json(chapterBatch.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202)), token));
 app.MapPost("/api/chapters/batch/cancel", () => chapterBatch.Cancel());
 log.Add("Information", "Helper", "EmbyBlurayHelper 0.2.0 已启动。管理界面与播放代理独立监听。");
 Console.WriteLine($"EmbyBlurayHelper 0.2.0\nManagement: {settings.Startup.ManagementUrl}\nProxy: {settings.Startup.ProxyUrl}\nAccount file: {accounts.FilePath}");

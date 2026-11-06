@@ -39,6 +39,7 @@ public sealed partial class BlurayHelperService
         try
         {
             var target = BluRaySourceResolver.Resolve(LibraryManager, request.ItemId, request.MediaSourceId);
+            LibraryProcessingScope.RequireAllowed(LibraryManager, target.Item, target.Source.Path);
             var result = await new ChapterWriter(LibraryManager, ItemRepository).Fill(target, request.ExpectedSignature, Request.CancellationToken).ConfigureAwait(false);
             Logger.Info("NativeChapters: saved and verified original chapters for {0} ({1}), source {2}. Audio/video/subtitles and skip markers retained.", target.Item.Name, request.ItemId, target.Source.Id);
             return result;

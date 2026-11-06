@@ -45,17 +45,19 @@ internal sealed class MediaFeatureBatch : IAsyncDisposable
         lock (gate)
         {
             var same = plan.ConnectionFingerprint == MediaFeatureCatalog.Connection(settings.Current) && plan.EngineSignature == MediaFeatureCatalog.Engine(settings.Current);
+            var items = same ? plan.Items : [];
+            var libraries = same ? plan.Libraries : [];
             var run = plan.PlannedItemIds.ToHashSet(StringComparer.Ordinal);
             return new
             {
-                plan.Id, plan.Status, plan.Operation, plan.Message, plan.PersistenceWarning, plan.ScanComplete,
-                plan.StartedAt, plan.FinishedAt, plan.MoviesChecked, plan.Planned, plan.Processed, plan.Completed, plan.Failed, plan.Skipped,
+                plan.Id, plan.Status, plan.Operation, message = same ? plan.Message : "Emby 连接、全局范围或规格配置已变化，请重新检查。", plan.PersistenceWarning, scanComplete = same && plan.ScanComplete,
+                plan.StartedAt, plan.FinishedAt, moviesChecked = same ? plan.MoviesChecked : 0, plan.Planned, plan.Processed, plan.Completed, plan.Failed, plan.Skipped,
                 plan.CurrentItemId, plan.CurrentName, plan.SelectedLibraryIds, plan.IncludeVerified,
                 active = Active(plan.Status), connectionMatches = same,
                 canFill = !Active(plan.Status) && plan.ScanComplete && same && plan.Items.Count > 0,
-                summary = new { discs = plan.Items.Count, verified = plan.Items.Count(Verified), pending = plan.Items.Count(i => !Verified(i)),
-                    bdmv = plan.Items.Count(i => i.Sources.Any(s => s.Kind == "BDMV")), iso = plan.Items.Count(i => i.Sources.Any(s => s.Kind == "ISO")) },
-                libraries = plan.Libraries.Select(l => new
+                summary = new { discs = items.Count, verified = items.Count(Verified), pending = items.Count(i => !Verified(i)),
+                    bdmv = items.Count(i => i.Sources.Any(s => s.Kind == "BDMV")), iso = items.Count(i => i.Sources.Any(s => s.Kind == "ISO")) },
+                libraries = libraries.Select(l => new
                 {
                     l.Id, l.Name, l.ScanComplete, l.MoviesChecked,
                     discs = plan.Items.Count(i => i.LibraryIds.Contains(l.Id)),
@@ -64,7 +66,7 @@ internal sealed class MediaFeatureBatch : IAsyncDisposable
                     taskPlanned = plan.Items.Count(i => i.LibraryIds.Contains(l.Id) && run.Contains(i.Id)),
                     taskProcessed = plan.Items.Count(i => i.LibraryIds.Contains(l.Id) && run.Contains(i.Id) && i.ProcessedInRun)
                 }).ToArray(),
-                items = plan.Items.Select(i => new { i.Id, i.Name, i.LibraryIds, i.Result, i.Message, i.AttemptedAt,
+                items = items.Select(i => new { i.Id, i.Name, i.LibraryIds, i.Result, i.Message, i.AttemptedAt,
                     verified = Verified(i), sources = i.Sources.Select(s => new { s.Id, s.Kind, s.Details, s.VerifiedAt }).ToArray() }).ToArray()
             };
         }
@@ -74,10 +76,11 @@ internal sealed class MediaFeatureBatch : IAsyncDisposable
         lock (gate)
         {
             RequireIdle(); var config = Config();
-            var history = plan.ConnectionFingerprint == MediaFeatureCatalog.Connection(config) && plan.EngineSignature == MediaFeatureCatalog.Engine(config)
-                ? plan.Items.ToDictionary(i => i.Id, StringComparer.Ordinal) : [];
+            var history = (plan.ConnectionIdentity.Length > 0 ? plan.ConnectionIdentity : plan.ConnectionFingerprint) == SettingsStore.ConnectionIdentity(config) && plan.EngineSignature == MediaFeatureCatalog.Engine(config)
+                ? plan.Items.Concat(plan.VerificationHistory).GroupBy(i => i.Id).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal) : [];
             plan = new MediaFeaturePlan { Id = Guid.NewGuid().ToString("N"), Status = "scanning", StartedAt = DateTimeOffset.UtcNow,
-                ConnectionFingerprint = MediaFeatureCatalog.Connection(config), EngineSignature = MediaFeatureCatalog.Engine(config),
+                ConnectionFingerprint = MediaFeatureCatalog.Connection(config), ConnectionIdentity = SettingsStore.ConnectionIdentity(config), EngineSignature = MediaFeatureCatalog.Engine(config),
+                ServerId = plan.ServerId, VerificationHistory = history.Values.ToList(),
                 Message = "正在读取媒体库，仅收集 BDMV 文件夹和 Blu-ray ISO，不探测视频。" };
             Launch(token => ScanCore(config, history, token)); return Snapshot();
         }
@@ -147,6 +150,7 @@ internal sealed class MediaFeatureBatch : IAsyncDisposable
         var server = await catalog.Read(config, "System/Info/Public", token);
         var serverId = MediaFeatureCatalog.Text(server, "Id");
         if (serverId.Length == 0) throw new InvalidDataException("Emby 未返回服务器 ID。");
+        if (plan.ServerId.Length > 0 && plan.ServerId != serverId) { history.Clear(); Update(() => plan.VerificationHistory.Clear()); }
         var groups = await catalog.Libraries(config, token);
         Update(() => { plan.ServerId = serverId; plan.Libraries = groups; });
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -170,7 +174,7 @@ internal sealed class MediaFeatureBatch : IAsyncDisposable
                                 source.VerifiedAt = checkedSource?.VerifiedAt;
                             }
                         if (Verified(movie)) { movie.Result = "completed"; movie.Message = "上次批量核验结果仍有效"; }
-                        discs.Add(id, movie); plan.Items.Add(movie);
+                        discs.Add(id, movie); plan.Items.Add(movie); plan.VerificationHistory.RemoveAll(i => i.Id == id);
                     }
                     plan.Message = $"正在检查「{group.Name}」：{group.MoviesChecked} 部电影，累计 {plan.Items.Count} 部 BDMV / ISO。";
                 }

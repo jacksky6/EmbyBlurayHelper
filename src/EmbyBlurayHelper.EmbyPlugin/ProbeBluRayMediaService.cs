@@ -28,7 +28,7 @@ public sealed partial class BlurayHelperService : BaseApiService
     {
         status = "ready",
         version = typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "unknown",
-        capabilities = new[] { "media-streams", "missing-runtime", "missing-size", "bdmv-direct-probe", "playlist-repair", "media-features", "automatic-media-features", "media-features-verification", "native-chapters", "disc-thumbnails-emby-settings", "plugin-self-update" }
+        capabilities = new[] { "media-streams", "missing-runtime", "missing-size", "bdmv-direct-probe", "playlist-repair", "media-features", "automatic-media-features", "media-features-verification", "native-chapters", "disc-thumbnails-emby-settings", "plugin-self-update", "library-processing-scope" }
     };
 
     public object Get(MediaFeatureConfigurationRequest request) => new
@@ -58,6 +58,7 @@ public sealed partial class BlurayHelperService : BaseApiService
         try
         {
             var target = BluRaySourceResolver.Resolve(LibraryManager, request.ItemId, request.MediaSourceId);
+            LibraryProcessingScope.RequireAllowed(LibraryManager, target.Item, target.Source.Path);
             var started = DateTime.UtcNow;
             var media = await BluRayMediaProbe.Probe(MediaProbeManager, target.Source, Request.CancellationToken).ConfigureAwait(false);
             if (!MediaFeatureReceipt.Confirm(target.Source.Path, started, out var verification))
@@ -81,6 +82,7 @@ public sealed partial class BlurayHelperService : BaseApiService
         try
         {
             var target = BluRaySourceResolver.Resolve(LibraryManager, request.ItemId, request.MediaSourceId);
+            LibraryProcessingScope.RequireAllowed(LibraryManager, target.Item, target.Source.Path);
             var media = await BluRayMediaProbe.Probe(MediaProbeManager, target.Source, Request.CancellationToken).ConfigureAwait(false);
             var saved = new BluRayMediaWriter(LibraryManager, ItemRepository).Save(target, media, Request.CancellationToken, request.RepairPlaylist);
             Logger.Info("Blu-ray media information saved for {0} ({1}): runtime {2}; size {3} bytes. Audio languages: [{4}]. Subtitle languages: [{5}].",

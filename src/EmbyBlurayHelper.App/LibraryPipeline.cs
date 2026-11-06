@@ -40,6 +40,7 @@ internal sealed class LibraryPipeline : IAsyncDisposable
     }
 
     private bool Running => status is "running" or "cancelling";
+    internal bool Active { get { lock (gate) return Running; } }
 
     internal object Snapshot()
     {

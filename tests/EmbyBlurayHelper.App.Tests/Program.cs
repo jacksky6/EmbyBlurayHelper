@@ -92,6 +92,9 @@ try
     Check((await client.GetAsync("api/account")).StatusCode == HttpStatusCode.Unauthorized, "account settings require login");
     Check((await client.GetAsync("api/probe/status")).StatusCode == HttpStatusCode.Unauthorized, "probe status requires login");
     Check((await client.GetAsync("api/library-language")).StatusCode == HttpStatusCode.Unauthorized, "library task status requires login");
+    Check((await client.GetAsync("api/library-scope")).StatusCode == HttpStatusCode.Unauthorized, "global scope requires login");
+    Check((await client.PostAsJsonAsync("api/library-scope", new { serverId = "one", excludedLibraryIds = new[] { "a" } })).StatusCode == HttpStatusCode.Unauthorized, "anonymous requests cannot change processing scope");
+    Check((await client.GetAsync("/library-scope.js")).IsSuccessStatusCode, "global scope UI script is embedded and served");
     Check((await client.GetAsync("api/iso/status")).StatusCode == HttpStatusCode.Unauthorized, "ISO readiness requires management login");
     Check((await client.GetAsync("api/media-features")).StatusCode == HttpStatusCode.Unauthorized, "supplementary feature status requires management login");
     Check((await client.GetAsync("api/media-features/batch")).StatusCode == HttpStatusCode.Unauthorized, "feature batch progress requires login");
@@ -103,7 +106,7 @@ try
     Check(updateManifestResponse.IsSuccessStatusCode, "embedded plugin update manifest is available: " + (updateManifestResponse.IsSuccessStatusCode ? "OK" : updateManifestJson));
     var updateManifest = JsonDocument.Parse(updateManifestJson).RootElement;
     var updateBinary = await client.GetByteArrayAsync("/plugin-update/EmbyBlurayHelper.Plugin.dll");
-    Check(updateManifest.GetProperty("assemblyName").GetString() == "EmbyBlurayHelper.Plugin" && updateManifest.GetProperty("version").GetString() == "0.1.8" &&
+    Check(updateManifest.GetProperty("assemblyName").GetString() == "EmbyBlurayHelper.Plugin" && updateManifest.GetProperty("version").GetString() == "0.1.10" &&
         updateManifest.GetProperty("schemaVersion").GetInt32() == 1 && updateManifest.GetProperty("size").GetInt64() == updateBinary.Length &&
         updateManifest.GetProperty("sha256").GetString() == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(updateBinary)).ToLowerInvariant() &&
         updateBinary.AsSpan(0, 2).SequenceEqual(new byte[] { 77, 90 }), "anonymous update source serves only the matching embedded plugin and verified manifest");

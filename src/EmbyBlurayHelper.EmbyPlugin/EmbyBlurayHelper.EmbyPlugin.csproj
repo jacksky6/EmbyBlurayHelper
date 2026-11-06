@@ -5,10 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>EmbyBlurayHelper.Plugin</AssemblyName>
-    <Version>0.1.8</Version>
+    <Version>0.1.10</Version>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Shared/LibraryPathScope.cs" Link="Scope/LibraryPathScope.cs" />
     <EmbeddedResource Include="Artwork/thumbnail.png" LogicalName="EmbyBlurayHelper.Plugin.thumbnail.png" />
     <EmbeddedResource Include="Web/update.html" LogicalName="EmbyBlurayHelper.Plugin.update.html" />
     <EmbeddedResource Include="Web/update.js" LogicalName="EmbyBlurayHelper.Plugin.update.js" />

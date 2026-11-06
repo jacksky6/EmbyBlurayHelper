@@ -39,7 +39,7 @@ public sealed class AutomaticMediaFeatureProvider : ICustomMetadataProvider<Movi
         return Prefix(item) + item.Path + "|" + file.Length + "|" + file.LastWriteTimeUtc.Ticks;
     }
     public bool HasChanged(BaseItem item, LibraryOptions options, IDirectoryService directory) =>
-        Plugin.Instance.Configuration.EnableAutomaticMediaFeatures && Disc(item) &&
+        Plugin.Instance.Configuration.EnableAutomaticMediaFeatures && Disc(item) && LibraryProcessingScope.Allowed(library, item) &&
         (item.DateLastRefreshed == default || Plugin.Instance.Configuration.AutomaticFeatureChecks.Any(s =>
             s.StartsWith(Prefix(item), StringComparison.Ordinal) && s != Stamp(item)));
 
@@ -47,10 +47,11 @@ public sealed class AutomaticMediaFeatureProvider : ICustomMetadataProvider<Movi
         LibraryOptions libraryOptions, CancellationToken token)
     {
         var item = result.Item;
-        if (!Plugin.Instance.Configuration.EnableAutomaticMediaFeatures || !Disc(item)) return ItemUpdateType.None;
+        if (!Plugin.Instance.Configuration.EnableAutomaticMediaFeatures || !Disc(item) || !LibraryProcessingScope.Allowed(library, item)) return ItemUpdateType.None;
         await Plugin.ProbeGate.WaitAsync(token).ConfigureAwait(false);
         try
         {
+            if (!LibraryProcessingScope.Allowed(library, item)) return ItemUpdateType.None;
             var checks = Plugin.Instance.Configuration.AutomaticFeatureChecks;
             var force = options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh;
             if (!force && (checks.Contains(Stamp(item)) || (item.DateLastRefreshed != default &&
@@ -59,6 +60,7 @@ public sealed class AutomaticMediaFeatureProvider : ICustomMetadataProvider<Movi
             var sources = item.GetMediaSources(false, false, libraryOptions);
             foreach (var source in sources.Where(s => BluRaySourceResolver.IsBluRaySource(s.Container, s.Path)))
             {
+                if (!LibraryProcessingScope.Allowed(library, item, source.Path)) continue;
                 var started = DateTime.UtcNow;
                 var media = await BluRayMediaProbe.Probe(probe, source, token).ConfigureAwait(false);
                 if (!MediaFeatureReceipt.Confirm(source.Path, started, out var verification))

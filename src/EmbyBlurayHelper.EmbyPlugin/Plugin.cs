@@ -14,9 +14,11 @@ public sealed class Plugin : BasePlugin<HelperPluginConfiguration>, IHasWebPages
     public static Plugin Instance { get; private set; } = null!;
     internal static readonly SemaphoreSlim ProbeGate = new(1, 1);
     internal Updates.PluginUpdater Updater { get; }
-    public Plugin(IApplicationPaths paths, IXmlSerializer serializer) : base(paths, serializer)
+    internal string ServerId { get; }
+    public Plugin(IApplicationPaths paths, IXmlSerializer serializer, MediaBrowser.Common.IApplicationHost host) : base(paths, serializer)
     {
         Instance = this;
+        ServerId = host.SystemId;
         Updater = new Updates.PluginUpdater(paths.PluginsPath, typeof(Plugin).Assembly.GetName().Version!);
     }
     public override string Name => "EmbyBlurayHelper";
@@ -36,6 +38,8 @@ public sealed class Plugin : BasePlugin<HelperPluginConfiguration>, IHasWebPages
 public sealed class HelperPluginConfiguration : BasePluginConfiguration
 {
     public string UpdateHelperUrl { get; set; } = "http://127.0.0.1:8099";
+    public string ProcessingScopeServerId { get; set; } = string.Empty;
+    public string[] ExcludedLibraryIds { get; set; } = Array.Empty<string>();
     public bool EnableAutomaticMediaFeatures { get; set; }
     public List<string> AutomaticFeatureChecks { get; set; } = new();
     public bool EnableNativeChapters { get; set; }

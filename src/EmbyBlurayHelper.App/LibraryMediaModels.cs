@@ -5,6 +5,8 @@ internal sealed class LibraryPlan
     public string Id { get; set; } = "";
     public string ServerId { get; set; } = "";
     public string ConnectionFingerprint { get; set; } = "";
+    public string ConnectionIdentity { get; set; } = "";
+    public List<LibraryMovie> VerificationHistory { get; set; } = [];
     public string Status { get; set; } = "idle";
     public string Operation { get; set; } = "scan";
     public bool ScanComplete { get; set; }

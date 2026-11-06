@@ -30,6 +30,8 @@ jobs:
         run: dotnet run --project tests/EmbyBlurayHelper.Proxy.Tests -c Release
       - name: Verify library language tasks
         run: dotnet run --project tests/EmbyBlurayHelper.Library.Tests -c Release
+      - name: Verify global library processing scope
+        run: dotnet run --project tests/EmbyBlurayHelper.Scope.Tests -c Release
       - name: Verify Emby plugin stream preservation
         run: dotnet run --project tests/EmbyBlurayHelper.EmbyPlugin.Tests -c Release
       - name: Verify plugin update validation and atomic replacement
@@ -49,6 +51,8 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/helper-ui" jsdom@26.1.0 --no-save --package-lock=false --ignore-scripts
           node tests/web/library-language.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
+          node tests/web/library-tasks.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
+          node tests/web/library-scope.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
           node tests/web/native-chapters.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
           node tests/web/plugin-update.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
       - name: Publish unified Web console
@@ -62,13 +66,14 @@ jobs:
         run: |
           chmod +x artifacts/app/linux-x64/EmbyBlurayHelper
           dotnet run --project tests/EmbyBlurayHelper.App.Tests -c Release -- artifacts/app/linux-x64/EmbyBlurayHelper
+          dotnet run --project tests/EmbyBlurayHelper.Scope.Tests -c Release -- artifacts/app/linux-x64/EmbyBlurayHelper
       - name: Package unified Web console
         run: sh scripts/package-portable.sh ${{ matrix.rid }}
       - name: Package DSM 7.2 x86_64
         if: matrix.rid == 'linux-x64'
         run: |
           python3 scripts/package-synology.py
-          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-25-dsm7.2-x86_64.spk --lifecycle
+          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk --lifecycle
       - uses: actions/upload-artifact@v4
         if: matrix.rid == 'linux-x64'
         with:

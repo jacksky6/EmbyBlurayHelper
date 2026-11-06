@@ -7,7 +7,7 @@ let probeChanging = false, settingsSaving = false;
 let logRevision = 0, logsClearing = false;
 let multiClipStatus = null, multiClipChanging = false, multiClipRevision = 0;
 let isoStatus = null, isoLoading = false, isoRequest = null, isoRevision = 0;
-const labels = { overview:'概览', library:'媒体库处理', language:'语言与时长', 'media-features':'音视频规格', chapters:'章节与截图', infuse:'播放增强', diagnostics:'单片检查', logs:'运行日志', connection:'连接与账号' };
+const labels = { overview:'概览', library:'媒体库处理', language:'语言与时长', 'media-features':'音视频规格', chapters:'章节与截图', infuse:'播放增强', diagnostics:'单片检查', logs:'运行日志', connection:'全局设置' };
 const groups = { overview:'工作空间', library:'Emby 媒体库', language:'Emby 媒体库', 'media-features':'Emby 媒体库', chapters:'Emby 媒体库', infuse:'Infuse 播放', diagnostics:'工具', logs:'工具', connection:'设置' };
 let mediaFeatureBusy = false, mediaFeatureReady = false;
 // Overview-only snapshots; each page keeps its own live state.
@@ -113,6 +113,7 @@ function showSaved(fields) {
 async function saveServer() {
   await saveSetting({ embyUrl:$('#emby-url').value.trim().replace(/\/$/,''), embyApiKey:$('#api-key').value.trim(), upstreamProbePath:$('#probe-path').value.trim() });
   showSaved(['emby-url','api-key','probe-path']);
+  window.dispatchEvent(new Event('helper:connection-saved'));
   probeRevision++; probeStatus = null; isoRevision++; isoStatus = null; isoRequest = null;
   await Promise.all([refreshProbeStatus(true),refreshMultiClipStatus(),refreshIsoStatus()]);
 }

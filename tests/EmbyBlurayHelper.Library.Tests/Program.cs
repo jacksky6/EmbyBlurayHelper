@@ -312,6 +312,28 @@ try
         Check(S(state,"status") == "interrupted" && backend.Writes.Count == writesBeforeRestart, "restart preserves plan and marks interrupted without submitting work");
         Check(S(state.GetProperty("items")[0],"result") == "unverified", "interrupted item never becomes a successful item");
     }
+    using (var scopedBackend = new MockEmby { Items = [MockEmby.Movie("901", null), MockEmby.Movie("902", null)],
+        Memberships = new() { ["a"] = ["901"], ["b"] = ["902"] } })
+    using (var scopedClient = new HttpClient(scopedBackend))
+    await using (var scopedTask = new LibraryLanguageTask(settings, scopedClient, log))
+    {
+        scopedTask.Scan(); var originalPlan = await Idle(scopedTask);
+        scopedTask.Fill(S(originalPlan,"id"), ["b"]); originalPlan = await Idle(scopedTask);
+        settings.Save(settings.Current with { ExcludedLibrariesByServer = new() { ["fixture-server"] = ["b"] } });
+        var stale = State(scopedTask);
+        Check(!stale.GetProperty("connectionMatches").GetBoolean() && stale.GetProperty("libraries").GetArrayLength() == 0 && stale.GetProperty("items").GetArrayLength() == 0,
+            "changing global scope hides stale libraries and film rows");
+        Check(N(stale, "moviesChecked") == 0 && N(stale.GetProperty("summary"), "blurayMovies") == 0, "stale scope does not contaminate totals");
+        Throws(() => scopedTask.Fill(S(originalPlan,"id"), ["b"]), "old plan cannot process a newly excluded library");
+        scopedTask.Scan(); var scoped = await Idle(scopedTask);
+        Check(scoped.GetProperty("libraries").GetArrayLength() == 1 && N(scoped,"moviesChecked") == 1 && S(scoped.GetProperty("items")[0],"id") == "901", "language checks enumerate allowed libraries only");
+        Throws(() => scopedTask.Fill(S(scoped,"id"), ["b"]), "direct fill request cannot choose an excluded library");
+        settings.Save(settings.Current with { ExcludedLibrariesByServer = new() { ["different-server"] = ["b"] } });
+        scopedTask.Scan(); scoped = await Idle(scopedTask);
+        Check(scoped.GetProperty("libraries").GetArrayLength() == 2, "another server's exclusions do not hide this server's libraries");
+        Check(scoped.GetProperty("items").EnumerateArray().Single(i => S(i,"id") == "902").GetProperty("verifiedAt").ValueKind == JsonValueKind.String,
+            "excluding and restoring a library retains verification history for unchanged discs");
+    }
     Console.WriteLine($"Passed {count} library task checks.");
 }
 finally { Directory.Delete(directory,true); }

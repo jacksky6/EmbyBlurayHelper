@@ -65,32 +65,34 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         lock (gate)
         {
             var same = plan.ConnectionFingerprint == Fingerprint(settings.Current);
-            var pending = plan.Items.Count(i => i.Classification is "missing" or "unknown");
+            var items = same ? plan.Items : [];
+            var libraries = same ? plan.Libraries : [];
+            var pending = items.Count(i => i.Classification is "missing" or "unknown");
             var plannedIds = plan.PlannedItemIds.ToHashSet(StringComparer.Ordinal);
             return new
             {
                 plan.Id, plan.Status, plan.Operation, plan.StartedAt, plan.FinishedAt, plan.CheckedAt,
-                plan.ScanComplete, plan.MoviesChecked, plan.MoviesTotal, plan.Planned, plan.Processed,
+                scanComplete = same && plan.ScanComplete, moviesChecked = same ? plan.MoviesChecked : 0, moviesTotal = same ? plan.MoviesTotal : 0, plan.Planned, plan.Processed,
                 plan.Completed, plan.Partial, plan.Failed, plan.Skipped, plan.CurrentItemId, plan.CurrentName,
-                plan.Message, plan.PersistenceWarning, plan.SelectedLibraryIds, plan.Scope, plan.IncludeVerified,
-                librariesChecked = plan.Libraries.Count(l => l.ScanComplete),
+                message = same ? plan.Message : "Emby 连接或全局处理范围已变化，请重新检查媒体库。", plan.PersistenceWarning, plan.SelectedLibraryIds, plan.Scope, plan.IncludeVerified,
+                librariesChecked = libraries.Count(l => l.ScanComplete),
                 active = Active(plan.Status), connectionMatches = same,
                 canFill = !Active(plan.Status) && plan.ScanComplete && plan.Libraries.Count > 0 && same && pending > 0,
                 summary = new
                 {
-                    blurayMovies = plan.Items.Count,
-                    uhdMovies = plan.Items.Count(i => i.Format == "UHD"),
-                    fullHdMovies = plan.Items.Count(i => i.Format == "Blu-ray"),
-                    unclassifiedMovies = plan.Items.Count(i => i.Format is not ("UHD" or "Blu-ray")),
-                    completeMovies = plan.Items.Count(i => i.Classification == "complete"),
-                    missingMovies = plan.Items.Count(i => i.Classification == "missing"),
-                    unknownMovies = plan.Items.Count(i => i.Classification == "unknown"),
-                    unsupportedMovies = plan.Items.Count(i => i.Classification == "unsupported"),
-                    missingAudio = plan.Items.Sum(i => i.MissingAudio),
-                    missingSubtitles = plan.Items.Sum(i => i.MissingSubtitles),
-                    missingRuntimeMovies = plan.Items.Count(i => i.MissingRuntime > 0), pendingMovies = pending
+                    blurayMovies = items.Count,
+                    uhdMovies = items.Count(i => i.Format == "UHD"),
+                    fullHdMovies = items.Count(i => i.Format == "Blu-ray"),
+                    unclassifiedMovies = items.Count(i => i.Format is not ("UHD" or "Blu-ray")),
+                    completeMovies = items.Count(i => i.Classification == "complete"),
+                    missingMovies = items.Count(i => i.Classification == "missing"),
+                    unknownMovies = items.Count(i => i.Classification == "unknown"),
+                    unsupportedMovies = items.Count(i => i.Classification == "unsupported"),
+                    missingAudio = items.Sum(i => i.MissingAudio),
+                    missingSubtitles = items.Sum(i => i.MissingSubtitles),
+                    missingRuntimeMovies = items.Count(i => i.MissingRuntime > 0), pendingMovies = pending
                 },
-                libraries = plan.Libraries.Select(l =>
+                libraries = libraries.Select(l =>
                 {
                     var movies = plan.Items.Where(i => i.LibraryIds.Contains(l.Id)).ToArray();
                     var run = movies.Where(i => plannedIds.Contains(i.Id)).ToArray();
@@ -108,7 +110,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
                         taskPlanned = run.Length, taskProcessed = run.Count(i => i.ProcessedInRun)
                     };
                 }).ToArray(),
-                items = plan.Items.Select(i => new
+                items = items.Select(i => new
                 {
                     i.Id, i.Name, i.Format, i.Classification, i.MissingAudio, i.MissingSubtitles, i.MissingRuntime, i.LibraryIds,
                     sources = i.Sources.Select(s => new { s.Id, s.IsIso, s.RunTimeTicks }).ToArray(),
@@ -124,11 +126,13 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         {
             RequireIdle();
             var config = Config();
-            var history = plan.ConnectionFingerprint == Fingerprint(config) ? plan.Items.ToDictionary(i => i.Id) : [];
+            var history = (plan.ConnectionIdentity.Length > 0 ? plan.ConnectionIdentity : plan.ConnectionFingerprint) == SettingsStore.ConnectionIdentity(config)
+                ? plan.Items.Concat(plan.VerificationHistory).GroupBy(i => i.Id).ToDictionary(g => g.Key, g => g.First()) : [];
             plan = new LibraryPlan
             {
                 Id = Guid.NewGuid().ToString("N"), Status = "scanning", Operation = "scan",
-                StartedAt = DateTimeOffset.UtcNow, ConnectionFingerprint = Fingerprint(config),
+                StartedAt = DateTimeOffset.UtcNow, ConnectionFingerprint = Fingerprint(config), ConnectionIdentity = SettingsStore.ConnectionIdentity(config),
+                ServerId = plan.ServerId, VerificationHistory = history.Values.ToList(),
                 Message = "正在读取 Emby 电影库和已保存的音轨、字幕语言及原盘时长。"
             };
             Launch(token => ScanCore(config, history, token));
@@ -195,7 +199,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
     }
 
     private static string Fingerprint(HelperSettings config) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(config.EmbyUrl.TrimEnd('/') + "\n" + config.EmbyApiKey)));
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(SettingsStore.PlanConnection(config))));
 
     private void EnsureContext(HelperSettings config, bool filling = false)
     {
@@ -245,12 +249,14 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         var server = await Read(config, "System/Info/Public", token);
         var serverId = Text(server, "Id");
         if (serverId.Length == 0) throw new InvalidOperationException("Emby 未返回服务器 ID，无法建立可靠的检查计划。");
+        if (plan.ServerId.Length > 0 && plan.ServerId != serverId) { history.Clear(); Update(() => plan.VerificationHistory.Clear()); }
         Update(() => plan.ServerId = serverId);
         var folders = await Read(config, "Library/VirtualFolders", token);
         if (folders.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("Emby 未返回媒体库列表，请检查管理权限。");
         var groups = folders.EnumerateArray().Select(l => new LibraryGroup { Id = Text(l, "ItemId"), Name = Text(l, "Name") }).ToArray();
         if (groups.Any(l => l.Id.Length == 0) || groups.Select(l => l.Id).Distinct().Count() != groups.Length)
             throw new InvalidOperationException("Emby 媒体库 ID 缺失或重复，无法建立可靠的分库计划。");
+        groups = groups.Where(l => SettingsStore.LibraryAllowed(config, serverId, l.Id)).ToArray();
         Update(() => plan.Libraries = groups.ToList());
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var byId = new Dictionary<string, LibraryMovie>(StringComparer.Ordinal);
@@ -303,6 +309,8 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
             Update(() =>
             {
                 foreach (var movie in memberships) movie.LibraryIds.Add(group.Id);
+                var visibleIds = discs.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+                plan.VerificationHistory.RemoveAll(i => visibleIds.Contains(i.Id));
                 plan.Items.AddRange(discs); plan.MoviesChecked = visited.Count;
                 group.MoviesChecked = groupVisited.Count; group.MoviesTotal = Math.Max(total, groupVisited.Count);
                 plan.MoviesTotal = Math.Max(visited.Count, plan.Libraries.Sum(l => l.MoviesTotal));
@@ -505,6 +513,8 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
 
     private async Task<HashSet<string>> ScopeItems(HelperSettings config, List<string> libraryIds, CancellationToken token)
     {
+        if (libraryIds.Any(id => !SettingsStore.LibraryAllowed(config, plan.ServerId, id)))
+            throw new InvalidOperationException("所选媒体库已在全局设置中排除，请重新检查。");
         var folders = await Read(config, "Library/VirtualFolders", token);
         if (folders.ValueKind != JsonValueKind.Array || libraryIds.Any(id => !folders.EnumerateArray().Any(l => Text(l, "ItemId") == id)))
             throw new InvalidOperationException("所选媒体库已删除或无法访问，请重新检查媒体库。");

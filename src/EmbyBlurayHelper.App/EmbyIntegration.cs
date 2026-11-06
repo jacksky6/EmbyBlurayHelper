@@ -143,7 +143,10 @@ internal sealed class EmbyIntegration(SettingsStore settings, HttpClient client,
     {
         await probeChange.WaitAsync(token);
         try { settings.Save(input with { EnableMediaFeatures = settings.Current.EnableMediaFeatures, FeatureProbePath = settings.Current.FeatureProbePath,
-            EnableNativeChapters = settings.Current.EnableNativeChapters }); }
+            EnableNativeChapters = settings.Current.EnableNativeChapters,
+            ExcludedLibrariesByServer = settings.Current.ExcludedLibrariesByServer,
+            ScopeConnection = settings.Current.ScopeConnection, ScopeServerId = settings.Current.ScopeServerId,
+            ScopeExcludedPaths = settings.Current.ScopeExcludedPaths }); }
         finally { probeChange.Release(); }
     }
 

@@ -4,8 +4,10 @@ namespace EmbyBlurayHelper.App;
 
 // No credentials are shared with the native DSM Emby account.
 internal sealed record ProbeSettings(string UpstreamProbePath, bool EnableProbeLanguagePatch,
-    bool EnableMediaFeatures = false, string FeatureProbePath = "")
+    bool EnableMediaFeatures = false, string FeatureProbePath = "", string[]? ExcludedLibraryPaths = null)
 {
+    public static ProbeSettings From(HelperSettings settings) => new(settings.UpstreamProbePath, settings.EnableProbeLanguagePatch,
+        settings.EnableMediaFeatures, settings.FeatureProbePath, SettingsStore.ExcludedPaths(settings));
     public static string SharedPath => Path.Combine(AppContext.BaseDirectory, "probe-settings.json");
     public static string ExecutablePath => OperatingSystem.IsLinux() && File.Exists(SharedPath) && File.Exists(Path.Combine(AppContext.BaseDirectory, "probe.sh"))
         ? Path.Combine(AppContext.BaseDirectory, "probe.sh") : Environment.ProcessPath!;
@@ -45,8 +47,7 @@ internal sealed record ProbeSettings(string UpstreamProbePath, bool EnableProbeL
         var path = Environment.GetEnvironmentVariable("EMBY_BLURAY_HELPER_PROBE_CONFIG");
         if (string.IsNullOrEmpty(path)) return;
         var temporary = path + ".new";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(new ProbeSettings(settings.UpstreamProbePath, settings.EnableProbeLanguagePatch,
-            settings.EnableMediaFeatures, settings.FeatureProbePath), SettingsStore.Json));
+        File.WriteAllText(temporary, JsonSerializer.Serialize(From(settings), SettingsStore.Json));
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temporary,
             UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
         File.Move(temporary, path, true);

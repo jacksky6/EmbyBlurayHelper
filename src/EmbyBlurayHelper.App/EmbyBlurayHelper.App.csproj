@@ -11,6 +11,7 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Shared/LibraryPathScope.cs" Link="Scope/LibraryPathScope.cs" />
     <ProjectReference Include="../EmbyBlurayHelper.EmbyPlugin/EmbyBlurayHelper.EmbyPlugin.csproj" ReferenceOutputAssembly="false" OutputItemType="PluginUpdateAssembly" />
     <Compile Include="../EmbyBlurayHelper.EmbyPlugin/Updates/PluginUpdateManifest.cs" Link="PluginUpdate/PluginUpdateManifest.cs" />
     <PackageReference Include="BDInfo" Version="0.8.0" />

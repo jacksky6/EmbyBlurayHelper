@@ -31,11 +31,12 @@ internal sealed class DiscThumbnailService(ILibraryManager library, IItemReposit
     {
         var options = library.GetLibraryOptions(item);
         var old = stagedChapters ?? repository.GetChapters(item);
-        if (!IsDisc(item) || !DiscThumbnailPolicy.Enabled(options, duringScan)) return old;
+        if (!IsDisc(item) || !LibraryProcessingScope.Allowed(library, item) || !DiscThumbnailPolicy.Enabled(options, duringScan)) return old;
         await Gate.WaitAsync(token).ConfigureAwait(false);
         string? work = null;
         try
         {
+            if (!LibraryProcessingScope.Allowed(library, item)) return old;
             options = library.GetLibraryOptions(item);
             if (!DiscThumbnailPolicy.Enabled(options, duringScan)) return old;
             var source = item.GetMediaSources(false, false, options).FirstOrDefault();
@@ -88,7 +89,7 @@ internal sealed class DiscThumbnailService(ILibraryManager library, IItemReposit
                     for (var i = 0; i < group.Length; i++)
                     {
                         token.ThrowIfCancellationRequested();
-                        if (!DiscThumbnailPolicy.Enabled(library.GetLibraryOptions(item), duringScan))
+                        if (!LibraryProcessingScope.Allowed(library, item) || !DiscThumbnailPolicy.Enabled(library.GetLibraryOptions(item), duringScan))
                             throw new InvalidOperationException("Emby 已关闭此媒体库的截图提取，停止处理。");
                         var output = Path.Combine(folder, i.ToString("D6", CultureInfo.InvariantCulture) + ".jpg");
                         rendered.Add(group[i].Position, await native.One(source, clip.InputPath, stream, protocol, item.Video3DFormat, times[i], output, token).ConfigureAwait(false));
@@ -101,7 +102,7 @@ internal sealed class DiscThumbnailService(ILibraryManager library, IItemReposit
             token.ThrowIfCancellationRequested();
             // Settings and source are checked again after expensive decoding.
             var currentOptions = library.GetLibraryOptions(item);
-            if (!DiscThumbnailPolicy.Enabled(currentOptions, duringScan) || DiscThumbnailPolicy.Interval(currentOptions) != interval ||
+            if (!LibraryProcessingScope.Allowed(library, item) || !DiscThumbnailPolicy.Enabled(currentOptions, duringScan) || DiscThumbnailPolicy.Interval(currentOptions) != interval ||
                 currentOptions.SaveLocalThumbnailSets != options.SaveLocalThumbnailSets ||
                 NativeChapterMerge.Signature(repository.GetChapters(item)) != signature ||
                 BluRaySourceResolver.FindCurrent(library, item, source) is not { } current || current.RunTimeTicks != source.RunTimeTicks || current.Size != source.Size)

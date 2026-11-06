@@ -106,6 +106,20 @@ try
         Check(N(ready.GetProperty("summary"), "pending") == 4, "new engine can recheck previous negative samples");
     }
     Check(log.Entries().Any(e => e.Source == "MediaFeatureBatch" && e.Message.Contains("媒体源")), "logs retain per-source verification results");
+    await using (var scoped = new MediaFeatureBatch(settings, client, log, backend.Probe))
+    {
+        var previous = Snapshot(scoped);
+        scoped.Fill(S(previous,"id"), null, true); previous = await Idle(scoped);
+        settings.Save(settings.Current with { ExcludedLibrariesByServer = new() { ["feature-server"] = ["b"] } });
+        Check(Snapshot(scoped).GetProperty("libraries").GetArrayLength() == 0 && N(Snapshot(scoped).GetProperty("summary"), "discs") == 0, "specs discard stale scope from visible libraries and totals");
+        Throws(() => scoped.Fill(S(previous,"id"), ["b"], true), "specs reject old plans after global exclusion");
+        scoped.Scan(); var filtered = await Idle(scoped);
+        Check(!filtered.GetProperty("libraries").EnumerateArray().Any(l => S(l,"id") == "b"), "spec checks exclude disallowed libraries");
+        Throws(() => scoped.Fill(S(filtered,"id"), ["b"], true), "spec fill rejects excluded library IDs");
+        settings.Save(settings.Current with { ExcludedLibrariesByServer = new() });
+        scoped.Scan(); var restored = await Idle(scoped);
+        Check(N(restored.GetProperty("summary"), "verified") == 4, "restored libraries retain positive and negative specification receipts without probing again");
+    }
     Console.WriteLine($"Passed {count} media-feature scope, batch and persistence checks.");
 }
 finally { Directory.Delete(directory, true); }

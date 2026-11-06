@@ -17,6 +17,11 @@ internal sealed record HelperSettings
     public bool EnableMediaFeatures { get; init; }
     public bool EnableNativeChapters { get; init; }
     public string FeatureProbePath { get; init; } = "";
+    // Persist only opt-outs. New libraries are allowed without any migration.
+    public Dictionary<string, string[]> ExcludedLibrariesByServer { get; init; } = new(StringComparer.Ordinal);
+    public string ScopeConnection { get; init; } = "";
+    public string ScopeServerId { get; init; } = "";
+    public string[] ScopeExcludedPaths { get; init; } = [];
 }
 
 internal sealed class SettingsStore
@@ -28,6 +33,18 @@ internal sealed class SettingsStore
     public string FilePath => Path.Combine(DataDirectory, "settings.json");
     public HelperSettings Current => Volatile.Read(ref current);
     public HelperSettings Startup { get; }
+
+    internal static string Connection(HelperSettings config) => config.EmbyUrl.TrimEnd('/') + "\n" + config.EmbyApiKey;
+    internal static string ConnectionIdentity(HelperSettings config) => Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Connection(config))));
+    internal static string ScopeStamp(HelperSettings config) => string.Join("\n", config.ExcludedLibrariesByServer
+        .Where(p => p.Value.Length > 0).OrderBy(p => p.Key, StringComparer.Ordinal)
+        .Select(p => p.Key + ":" + string.Join(",", p.Value.OrderBy(id => id, StringComparer.Ordinal))));
+    internal static string PlanConnection(HelperSettings config) => Connection(config) +
+        (ScopeStamp(config) is { Length: > 0 } scope ? "\nScope:" + scope : "");
+    internal static bool LibraryAllowed(HelperSettings config, string serverId, string id) =>
+        !config.ExcludedLibrariesByServer.TryGetValue(serverId, out var excluded) || !excluded.Contains(id, StringComparer.Ordinal);
+    internal static string[] ExcludedPaths(HelperSettings config) => config.ScopeConnection == Connection(config) ? config.ScopeExcludedPaths : [];
 
     public SettingsStore(string? dataDirectory = null)
     {
@@ -71,6 +88,10 @@ internal sealed class SettingsStore
     {
         if (settings.EmbyApiKey is null || settings.UpstreamProbePath is null || settings.FeatureProbePath is null)
             throw new ArgumentException("API key 和探测器路径不能为 null；未配置时请留空。");
+        if (settings.ExcludedLibrariesByServer is null || settings.ScopeExcludedPaths is null ||
+            settings.ExcludedLibrariesByServer.Any(p => string.IsNullOrWhiteSpace(p.Key) || p.Value is null || p.Value.Any(string.IsNullOrWhiteSpace)) ||
+            settings.ScopeExcludedPaths.Any(string.IsNullOrWhiteSpace))
+            throw new ArgumentException("媒体库处理范围配置无效。");
         if (settings.FeatureProbePath.Length > 0 && (!Path.IsPathFullyQualified(settings.FeatureProbePath) ||
             string.Equals(settings.FeatureProbePath, settings.UpstreamProbePath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
             throw new ArgumentException("增强 ffprobe 必须使用独立的完整路径，不能指向 Emby 原版 ffprobe。");

@@ -21,14 +21,14 @@
   const valid = s => { const t = snaps[s.key]; return !!t?.id && !t.error && t.scanComplete && t.connectionMatches !== false; };
   const libraries = () => {
     const merged = new Map();
-    for (const s of STEPS) for (const l of snaps[s.key]?.libraries || []) {
+    for (const s of STEPS) for (const l of snaps[s.key]?.connectionMatches === false ? [] : snaps[s.key]?.libraries || []) {
       const row = merged.get(l.id) || { id:l.id, name:l.name, movies:0, discs:0, pending:{} };
       row.movies = Math.max(row.movies, l.moviesChecked || 0); row.discs = Math.max(row.discs, l.blurayMovies ?? l.discs ?? 0);
       row.pending[s.key] = l.pendingMovies ?? l.pending ?? 0; merged.set(l.id, row);
     }
     return [...merged.values()];
   };
-  const inScope = s => (snaps[s.key]?.items || []).filter(i => (i.libraryIds || []).some(id => selected.has(id)));
+  const inScope = s => snaps[s.key]?.connectionMatches === false ? [] : (snaps[s.key]?.items || []).filter(i => (i.libraryIds || []).some(id => selected.has(id)));
   const eligible = s => valid(s) ? inScope(s).filter(i => again[s.key] || s.pending(i)) : [];
   const runnable = s => !s.blocked() && eligible(s).length > 0;
   function syncSelection() {
@@ -51,15 +51,15 @@
   }
   function render() {
     syncSelection();
-    const locked = busy || anyActive(), groups = libraries(), lang = snaps.language?.summary;
-    const discs = lang ? lang.blurayMovies : (snaps.features?.summary?.discs ?? null);
+    const locked = busy || anyActive(), groups = libraries(), lang = snaps.language?.connectionMatches !== false ? snaps.language?.summary : null;
+    const discs = lang ? lang.blurayMovies : (snaps.features?.connectionMatches !== false ? snaps.features?.summary?.discs ?? null : null);
     const movies = snaps.language?.moviesChecked ?? null;
     const uhd = lang?.uhdMovies ?? null;
     const fullHd = lang?.fullHdMovies ?? null;
     const unclassified = lang?.unclassifiedMovies ?? null;
     $('#lib-action-summary').textContent = discs !== null
       ? `${movies ?? '?'} 部电影 · ${discs} 部蓝光原盘` + (lang ? `\n其中 UHD 蓝光 ${uhd ?? '?'} 部 · 1080P 蓝光 ${fullHd ?? '?'} 部${unclassified > 0 ? ` · 规格未识别 ${unclassified} 部` : ''}` : '')
-      : '尚未检查媒体库';
+      : (STEPS.some(s => snaps[s.key]?.connectionMatches === false) ? '全局范围或连接已变化，请重新检查媒体库' : '尚未检查媒体库');
     const libsEl = $('#lib-action-libs');
     libsEl.hidden = false;
     const allSel = groups.length > 0 && groups.every(l => selected.has(l.id));
@@ -211,7 +211,7 @@
   $('#lib-page-size').addEventListener('change', () => { page = 0; renderRows(); });
   $('#lib-prev').onclick = () => { page--; renderRows(); }; $('#lib-next').onclick = () => { page++; renderRows(); };
   const summaries = { language:['summary-language','library-language'], 'media-features':['summary-features','media-features/batch'], chapters:['summary-chapters','chapters/batch'] };
-  const summaryText = (pg, t) => !t?.id ? '尚未检查媒体库。' : pg === 'language' ? `上次检查：${t.summary.blurayMovies} 部原盘 · ${t.summary.completeMovies} 部信息完整 · ${t.summary.missingMovies + t.summary.unknownMovies} 部待补全。`
+  const summaryText = (pg, t) => t?.connectionMatches === false ? '全局范围或连接已变化，请重新检查媒体库。' : !t?.id ? '尚未检查媒体库。' : pg === 'language' ? `上次检查：${t.summary.blurayMovies} 部原盘 · ${t.summary.completeMovies} 部信息完整 · ${t.summary.missingMovies + t.summary.unknownMovies} 部待补全。`
     : pg === 'media-features' ? `上次检查：${t.summary.discs} 部原盘 · ${t.summary.verified} 部已核验 · ${t.summary.pending} 部待核验。` : `上次检查：${t.summary.discs} 部原盘 · ${t.summary.verified} 部已补全 · ${t.summary.pending} 部待补全 · ${t.summary.preserved} 部已有章节。`;
   async function loadSummary(pg) {
     const [id, path] = summaries[pg];
@@ -225,6 +225,7 @@
   });
   document.addEventListener('visibilitychange', () => { clearTimeout(timer); if (visible()) refresh().catch(() => {}); });
   window.addEventListener('helper:status', () => { if (location.hash === '#library') render(); });
+  window.addEventListener('helper:scope-saved', () => { revision++; request = null; planKey = ''; snaps = {}; selected.clear(); });
   window.addEventListener('helper:logout', () => { clearTimeout(timer); clearTimeout(hideProgressTimer); hideProgressTimer = null; revision++; request = null; pipeline = null; snaps = {}; featureStatus = chapterStatus = null; planKey = ''; selected = new Set(); chosen = {}; again = {}; });
   render();
 })();

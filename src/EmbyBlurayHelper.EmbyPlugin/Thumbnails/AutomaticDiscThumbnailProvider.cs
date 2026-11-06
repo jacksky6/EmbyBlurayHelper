@@ -17,11 +17,11 @@ public sealed class AutomaticDiscThumbnailProvider(ILibraryManager library, IIte
     public string Name => "EmbyBlurayHelper disc thumbnails (Emby library settings)";
     public int Order => 1200;
     public bool HasChanged(BaseItem item, LibraryOptions options, IDirectoryService directory) =>
-        item is Movie movie && DiscThumbnailService.IsDisc(movie) && DiscThumbnailPolicy.Enabled(options, true) && item.DateLastRefreshed == default;
+        item is Movie movie && DiscThumbnailService.IsDisc(movie) && LibraryProcessingScope.Allowed(library, item) && DiscThumbnailPolicy.Enabled(options, true) && item.DateLastRefreshed == default;
 
     public async Task<ItemUpdateType> FetchAsync(MetadataResult<Movie> result, MetadataRefreshOptions refresh, LibraryOptions options, CancellationToken token)
     {
-        if (!DiscThumbnailService.IsDisc(result.Item) || !DiscThumbnailPolicy.Enabled(options, true)) return ItemUpdateType.None;
+        if (!DiscThumbnailService.IsDisc(result.Item) || !LibraryProcessingScope.Allowed(library, result.Item) || !DiscThumbnailPolicy.Enabled(options, true)) return ItemUpdateType.None;
         var previous = result.Chapters ?? repository.GetChapters(result.Item);
         if (previous.Count > 0) result.Chapters = previous;
         try

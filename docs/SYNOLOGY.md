@@ -6,12 +6,12 @@
 
 ## 安装与连接
 
-1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-25-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
+1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
 2. 打开 `http://NAS-IP:8099`，用户名 `admin`，密码 `123456`。也可从 DSM 的应用图标打开。
 3. 在 DSM「控制面板 → 共享文件夹 → 电影所在共享文件夹 → 编辑 → 权限」中，
    选择「系统内部用户」，给 `embyblurayhelper` **只读**权限。对所有需要读取的媒体共享文件夹重复此步骤。
    如果某个子目录已有明确拒绝规则，还需在 File Station 的目录权限中检查继承。
-4. 在工具的「连接与账号」中填写 `http://127.0.0.1:8096` 和 Emby 管理员 API key。
+4. 在工具的「全局设置」中填写 `http://127.0.0.1:8096` 和 Emby 管理员 API key。
    原版 ffprobe 路径可留空，点击「保存并测试连接」会从 Emby 自动获取并保存可访问的路径，再点击「检查 ffprobe」。已有手动配置会保留；也可单独点击「从 Emby 获取」或「检测本机 Emby」。
 5. 在「单片检查」中输入影片 ID。NAS 路径应类似 `/volume1/media/电影`，不能填 Windows UNC 路径。
 6. 在左侧「语言与时长」页打开「Emby 探测语言补全」开关，工具会自动备份并切换探测器，确认显示「已接入 Emby」。
@@ -63,6 +63,14 @@ Emby 调用 `probe.sh` 时，只读取单独导出的 `probe-settings.json`，�
 
 ## 升级与卸载
 
+### 0.2.0-27：处理范围保存状态
+
+明确区分「已保存」「正在读取」「正在保存」和「需要更新插件」。旧插件提供醒目提示及更新入口，禁用按钮使用普通光标；保存失败保留选择并持续显示原因。随附插件 **0.1.10**，完善 `concat:` 与 `file:` 路径的范围判断。插件 0.1.9 已支持范围保存；按钮显示修复只需升级 Helper / SPK。
+
+### 0.2.0-26：全局媒体库处理范围
+
+随附插件 **0.1.9**。左侧「全局设置」新增媒体库处理范围，检查、批量补全、新片自动补全及 Helper 章节截图共用；Infuse 播放增强保持独立。仅保存排除项，新增库默认允许，按服务器 ID 隔离，升级保留。范围改变后重新检查，既有信息和核验记录保留。需要在 Emby 更新配套 DLL 并重启后才能保存范围。详见[全局处理范围](LIBRARY-PROCESSING-SCOPE.md)。
+
 ### 0.2.0-25：插件封面
 
 随附插件更新为 **0.1.8**，新增突出 Blu-ray、UHD 原盘增强与 Infuse 的 16:9 封面。图片嵌入 DLL，Emby 插件列表直接显示，不依赖外部图片地址。已安装 0.1.7 的用户升级本套件后，可在 Emby 插件页面检查并安装 0.1.8，再重启 Emby，无需手动复制 DLL。
@@ -83,7 +91,7 @@ Helper 的更新 DLL 嵌入主程序，无需额外维护下载目录。更新�
 
 ### 0.2.0-22：Infuse 原盘章节，管理页面重新整理
 
-管理页面按「Emby 媒体库 / Infuse 播放 / 工具 / 设置」分组，页面改名为「语言与时长」「音视频规格」「章节与截图」「播放增强」「单片检查」「连接与账号」。所有开关点击后立即保存；路径、地址和账号在各自卡片内保存，不再有页面顶部的「保存设置」。语言、规格、章节三个批量任务使用同一套控件和措辞；「单片检查」一次显示一部影片的语言、规格、章节和 Infuse 呈现方式。新增「媒体库处理」：三项补全共用一次检查和一个媒体库选择，在后台按顺序执行，关闭浏览器不影响；Helper 重启会中止尚未开始的后续项，已完成的结果保留。概览显示 Emby 连接、探测器、插件版本和 Infuse 代理地址，以及需要处理的事项。
+管理页面按「Emby 媒体库 / Infuse 播放 / 工具 / 设置」分组，页面改名为「语言与时长」「音视频规格」「章节与截图」「播放增强」「单片检查」「全局设置」。所有开关点击后立即保存；路径、地址和账号在各自卡片内保存，不再有页面顶部的「保存设置」。语言、规格、章节三个批量任务使用同一套控件和措辞；「单片检查」一次显示一部影片的语言、规格、章节和 Infuse 呈现方式。新增「媒体库处理」：三项补全共用一次检查和一个媒体库选择，在后台按顺序执行，关闭浏览器不影响；Helper 重启会中止尚未开始的后续项，已完成的结果保留。概览显示 Emby 连接、探测器、插件版本和 Infuse 代理地址，以及需要处理的事项。
 
 左侧「播放增强」页的「Infuse 原盘章节」开关**默认关闭**，升级后不会自动改变 Infuse 的播放方式。开启后，经过 8097 的 Infuse 会把带 Emby 章节的 BDMV 视为一张虚拟 ISO，从中读取这些章节。不预先生成文件，不转码，不 remux，视频、音频、字幕仍按需从原文件读取。真实 ISO 和其他客户端不受影响。
 
@@ -158,7 +166,7 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 # 发布后仅重新打包：
 .\scripts\build-synology.ps1 -SkipPublish
 # 下一次版本升级必须递增最后的套件构建号：
-.\scripts\build-synology.ps1 -Version 0.2.0-26
+.\scripts\build-synology.ps1 -Version 0.2.0-27
 ```
 
 打包使用现有 WSL `Ubuntu-26.04` 的 Python 标准库；无需额外安装 SPK SDK。
@@ -166,15 +174,15 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 Linux / GitHub Actions 在发布 `linux-x64` 后可直接运行：
 
 ```sh
-python3 scripts/package-synology.py --version 0.2.0-25
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-25-dsm7.2-x86_64.spk
+python3 scripts/package-synology.py --version 0.2.0-27
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk
 ```
 
 生命周期及跨用户探测测试可在 Linux 运行；加 `--cross-user` 时用 root 启动测试，
 测试会在临时目录内分别以现有的 `nobody`、`daemon` 身份模拟两个套件，不创建系统账号：
 
 ```sh
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-25-dsm7.2-x86_64.spk --lifecycle --cross-user
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk --lifecycle --cross-user
 ```
 
 打包依据群晖官方 [套件格式](https://help.synology.com/developer-guide/synology_package/INFO.html)、

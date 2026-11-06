@@ -239,7 +239,7 @@ def lifecycle(path, packed, cross_user):
             with tarfile.open(fileobj=io.BytesIO(packed), mode="r:gz") as payload:
                 check(update_binary == payload.extractfile("emby-plugin/EmbyBlurayHelper.Plugin.dll").read(),
                       "Embedded update DLL exactly matches the SPK's manually installable DLL")
-            check(manifest["version"] == "0.1.8" and manifest["size"] == len(update_binary) and
+            check(manifest["version"] == "0.1.10" and manifest["size"] == len(update_binary) and
                   manifest["sha256"] == hashlib.sha256(update_binary).hexdigest(), "DSM serves the verified plugin update manifest")
             with client.open(f"http://127.0.0.1:{admin_port}/", timeout=10) as response:
                 overview = response.read()
@@ -263,7 +263,7 @@ def lifecycle(path, packed, cross_user):
             check(api("probe/check", {})["message"] == "ffprobe version fixture", "Service account can execute original probe")
             snapshot = var / "probe-settings.json"
             check(json.loads(snapshot.read_text()) == {"upstreamProbePath": str(fake), "enableProbeLanguagePatch": True,
-                  "enableMediaFeatures": False, "featureProbePath": ""}, "Shared snapshot contains only probe settings and safe disabled feature defaults")
+                  "enableMediaFeatures": False, "featureProbePath": "", "excludedLibraryPaths": []}, "Shared snapshot contains only probe settings, scope paths and safe disabled feature defaults")
             if cross_user:
                 result = subprocess.run(["sh", "-c", 'test ! -r "$1" && test -r "$2"', "sh", str(settings_path), str(target / "probe-settings.json")], user=probe_uid, group=probe_gid, extra_groups=[])
                 check(result.returncode == 0, "Emby can read snapshot but cannot read private API key")

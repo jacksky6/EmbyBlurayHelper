@@ -34,16 +34,22 @@ internal sealed class NativeChapterBatch : IAsyncDisposable
     }
     internal object Snapshot()
     {
-        lock (gate) return new { plan.Id, plan.Status, plan.Message, plan.PersistenceWarning, plan.ScanComplete, plan.Processed, plan.Planned,
+        lock (gate)
+        {
+        var same = plan.Connection == MediaFeatureCatalog.Connection(settings.Current);
+        var items = same ? plan.Items : [];
+        var libraries = same ? plan.Libraries : [];
+        return new { plan.Id, plan.Status, message = same ? plan.Message : "Emby 连接或全局范围已变化，请重新检查。", plan.PersistenceWarning, scanComplete = same && plan.ScanComplete, plan.Processed, plan.Planned,
             plan.Completed, plan.Failed, plan.Skipped, plan.CurrentName, plan.IncludeVerified, plan.SelectedLibraryIds,
             active = Active(plan.Status), connectionMatches = plan.Connection == MediaFeatureCatalog.Connection(settings.Current),
             canFill = !Active(plan.Status) && plan.ScanComplete && plan.Connection == MediaFeatureCatalog.Connection(settings.Current),
-            summary = new { discs = plan.Items.Count, verified = plan.Items.Count(i => i.Sources.All(s => s.State == "managed")),
-                pending = plan.Items.Count(i => !Done(i)), preserved = plan.Items.Count(i => i.Sources.Any(s => s.State == "existing")) },
-            libraries = plan.Libraries.Select(l => new { l.Id, l.Name, l.MoviesChecked, l.ScanComplete, discs = plan.Items.Count(i => i.LibraryIds.Contains(l.Id)),
+            summary = new { discs = items.Count, verified = items.Count(i => i.Sources.All(s => s.State == "managed")),
+                pending = items.Count(i => !Done(i)), preserved = items.Count(i => i.Sources.Any(s => s.State == "existing")) },
+            libraries = libraries.Select(l => new { l.Id, l.Name, l.MoviesChecked, l.ScanComplete, discs = plan.Items.Count(i => i.LibraryIds.Contains(l.Id)),
                 pending = plan.Items.Count(i => i.LibraryIds.Contains(l.Id) && !Done(i)), verified = plan.Items.Count(i => i.LibraryIds.Contains(l.Id) && i.Sources.All(s => s.State == "managed")),
                 preserved = plan.Items.Count(i => i.LibraryIds.Contains(l.Id) && i.Sources.Any(s => s.State == "existing")) }).ToArray(),
-            items = plan.Items.Select(i => new { i.Id, i.Name, i.LibraryIds, i.Result, i.Message, pending = !Done(i), sources = i.Sources.Select(s => new { s.Id, s.Kind, s.State, s.Count, s.Playlist }) }).ToArray() };
+            items = items.Select(i => new { i.Id, i.Name, i.LibraryIds, i.Result, i.Message, pending = !Done(i), sources = i.Sources.Select(s => new { s.Id, s.Kind, s.State, s.Count, s.Playlist }) }).ToArray() };
+        }
     }
     internal object Scan()
     {

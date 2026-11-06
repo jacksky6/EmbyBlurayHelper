@@ -75,6 +75,16 @@ try
     await using (var loaded = new NativeChapterBatch(store,http,service,log))
         Check(Text(Element(loaded.Snapshot()),"status") == "interrupted", "restart records interruption instead of a stuck running task");
     Check(backend.Authenticated && backend.Buffered, "all Emby calls authenticated and JSON mutations have fixed content length");
+    await using (var scoped = new NativeChapterBatch(store,http,service,log))
+    {
+        var previous = Element(scoped.Snapshot());
+        store.Save(store.Current with { EnableNativeChapters = true, ExcludedLibrariesByServer = new() { ["server"] = ["b"] } });
+        Check(Element(scoped.Snapshot()).GetProperty("libraries").GetArrayLength() == 0 && Number(Element(scoped.Snapshot()).GetProperty("summary"), "discs") == 0, "chapter snapshots remove stale scope and totals");
+        Throws(() => scoped.Fill(Text(previous,"id"), ["b"], true), "chapter fills reject plans made before a scope change");
+        scoped.Scan(); var filtered = await Idle(scoped);
+        Check(!filtered.GetProperty("libraries").EnumerateArray().Any(l => Text(l,"id") == "b"), "chapter catalog excludes disallowed libraries");
+        Throws(() => scoped.Fill(Text(filtered,"id"), ["b"], true), "chapter fill cannot choose an excluded library");
+    }
     Console.WriteLine($"Passed {count} native chapter configuration/batch checks.");
 }
 finally { Directory.Delete(root, true); }

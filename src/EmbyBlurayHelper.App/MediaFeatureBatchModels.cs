@@ -7,6 +7,8 @@ internal sealed class MediaFeaturePlan
     public string Id { get; set; } = "";
     public string ServerId { get; set; } = "";
     public string ConnectionFingerprint { get; set; } = "";
+    public string ConnectionIdentity { get; set; } = "";
+    public List<FeatureMovie> VerificationHistory { get; set; } = [];
     public string EngineSignature { get; set; } = "";
     public string Status { get; set; } = "idle";
     public string Operation { get; set; } = "scan";

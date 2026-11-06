@@ -23,7 +23,7 @@ public sealed class DiscThumbnailTask(ILibraryManager library, IItemRepository r
     {
         var log = logs.GetLogger("DiscThumbnails");
         var items = library.GetItemList(new InternalItemsQuery { Recursive = true, MediaTypes = new[] { "Video" }, GroupByPresentationUniqueKey = false })
-            .OfType<Video>().Where(v => DiscThumbnailService.IsDisc(v) && DiscThumbnailPolicy.Enabled(library.GetLibraryOptions(v), false)).ToArray();
+            .OfType<Video>().Where(v => DiscThumbnailService.IsDisc(v) && LibraryProcessingScope.Allowed(library, v) && DiscThumbnailPolicy.Enabled(library.GetLibraryOptions(v), false)).ToArray();
         log.Info("DiscThumbnails: Emby-following task started. {0} disc items in enabled libraries.", items.Length);
         var service = new DiscThumbnailService(library, repository, host, files, log);
         var failures = 0;

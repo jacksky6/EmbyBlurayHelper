@@ -12,7 +12,7 @@ internal sealed class MediaFeatureCatalog(SettingsStore settings, HttpClient cli
     internal static string Text(JsonElement value, string key) => value.ValueKind == JsonValueKind.Object &&
         value.TryGetProperty(key, out var field) && field.ValueKind == JsonValueKind.String ? field.GetString() ?? "" : "";
     internal static string Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
-    internal static string Connection(HelperSettings config) => Hash(config.EmbyUrl.TrimEnd('/') + "\n" + config.EmbyApiKey);
+    internal static string Connection(HelperSettings config) => Hash(SettingsStore.PlanConnection(config));
     internal static string Engine(HelperSettings config)
     {
         static string Stamp(string path)
@@ -48,10 +48,16 @@ internal sealed class MediaFeatureCatalog(SettingsStore settings, HttpClient cli
         var groups = raw.EnumerateArray().Select(l => new FeatureLibrary { Id = Text(l, "ItemId"), Name = Text(l, "Name") }).ToList();
         if (groups.Any(l => l.Id.Length == 0) || groups.Select(l => l.Id).Distinct().Count() != groups.Count)
             throw new InvalidDataException("Emby 媒体库 ID 缺失或重复，无法生成可靠计划。");
-        return groups;
+        var server = await Read(config, "System/Info/Public", token);
+        var serverId = Text(server, "Id");
+        if (serverId.Length == 0) throw new InvalidDataException("Emby 未返回服务器 ID。");
+        return groups.Where(l => SettingsStore.LibraryAllowed(config, serverId, l.Id)).ToList();
     }
     internal async Task Movies(HelperSettings config, string libraryId, Action<JsonElement> receive, CancellationToken token, Action? pageCompleted = null)
     {
+        var server = await Read(config, "System/Info/Public", token);
+        if (!SettingsStore.LibraryAllowed(config, Text(server, "Id"), libraryId))
+            throw new InvalidOperationException("该媒体库已在全局设置中排除，请重新检查。");
         var visited = new HashSet<string>(StringComparer.Ordinal);
         for (var offset = 0; ;)
         {
