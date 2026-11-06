@@ -1,11 +1,15 @@
-param([switch]$Apply, [switch]$HelperOnly)
+param([switch]$Apply, [switch]$HelperOnly, [string]$StagedPath)
 
 # Workstation-only update. Without -Apply this performs read-only preflight checks.
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $workspace = Split-Path -Parent $projectRoot
 $live = Join-Path $projectRoot 'artifacts\app\win-x64'
-$staged = Join-Path $projectRoot 'artifacts\checks\iso-app-batch-updated'
+$staged = if ([string]::IsNullOrWhiteSpace($StagedPath)) {
+    Join-Path $projectRoot 'artifacts\checks\iso-app-batch-updated'
+} else {
+    (Resolve-Path -LiteralPath $StagedPath).Path
+}
 $helperExe = Join-Path $live 'EmbyBlurayHelper.exe'
 $pluginSource = Join-Path $projectRoot 'artifacts\plugin\EmbyBlurayHelper.Plugin.dll'
 $pluginTarget = Join-Path $workspace 'programdata\plugins\EmbyBlurayHelper.Plugin.dll'
