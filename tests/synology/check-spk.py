@@ -239,7 +239,7 @@ def lifecycle(path, packed, cross_user):
             with tarfile.open(fileobj=io.BytesIO(packed), mode="r:gz") as payload:
                 check(update_binary == payload.extractfile("emby-plugin/EmbyBlurayHelper.Plugin.dll").read(),
                       "Embedded update DLL exactly matches the SPK's manually installable DLL")
-            check(manifest["version"] == "0.1.7" and manifest["size"] == len(update_binary) and
+            check(manifest["version"] == "0.1.8" and manifest["size"] == len(update_binary) and
                   manifest["sha256"] == hashlib.sha256(update_binary).hexdigest(), "DSM serves the verified plugin update manifest")
             with client.open(f"http://127.0.0.1:{admin_port}/", timeout=10) as response:
                 overview = response.read()

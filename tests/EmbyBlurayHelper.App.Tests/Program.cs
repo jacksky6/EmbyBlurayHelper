@@ -103,7 +103,7 @@ try
     Check(updateManifestResponse.IsSuccessStatusCode, "embedded plugin update manifest is available: " + (updateManifestResponse.IsSuccessStatusCode ? "OK" : updateManifestJson));
     var updateManifest = JsonDocument.Parse(updateManifestJson).RootElement;
     var updateBinary = await client.GetByteArrayAsync("/plugin-update/EmbyBlurayHelper.Plugin.dll");
-    Check(updateManifest.GetProperty("assemblyName").GetString() == "EmbyBlurayHelper.Plugin" && updateManifest.GetProperty("version").GetString() == "0.1.7" &&
+    Check(updateManifest.GetProperty("assemblyName").GetString() == "EmbyBlurayHelper.Plugin" && updateManifest.GetProperty("version").GetString() == "0.1.8" &&
         updateManifest.GetProperty("schemaVersion").GetInt32() == 1 && updateManifest.GetProperty("size").GetInt64() == updateBinary.Length &&
         updateManifest.GetProperty("sha256").GetString() == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(updateBinary)).ToLowerInvariant() &&
         updateBinary.AsSpan(0, 2).SequenceEqual(new byte[] { 77, 90 }), "anonymous update source serves only the matching embedded plugin and verified manifest");

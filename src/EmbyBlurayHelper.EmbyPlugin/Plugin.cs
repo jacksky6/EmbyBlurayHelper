@@ -3,12 +3,13 @@ using MediaBrowser.Common.Plugins;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Serialization;
 using MediaBrowser.Model.Plugins;
+using MediaBrowser.Model.Drawing;
 
 [assembly: Guid("cbe8e7e0-9155-48e9-8f45-912b7062c447")]
 
 namespace EmbyBlurayHelper.EmbyPlugin;
 
-public sealed class Plugin : BasePlugin<HelperPluginConfiguration>, IHasWebPages
+public sealed class Plugin : BasePlugin<HelperPluginConfiguration>, IHasWebPages, IHasThumbImage
 {
     public static Plugin Instance { get; private set; } = null!;
     internal static readonly SemaphoreSlim ProbeGate = new(1, 1);
@@ -19,6 +20,10 @@ public sealed class Plugin : BasePlugin<HelperPluginConfiguration>, IHasWebPages
         Updater = new Updates.PluginUpdater(paths.PluginsPath, typeof(Plugin).Assembly.GetName().Version!);
     }
     public override string Name => "EmbyBlurayHelper";
+
+    public ImageFormat ThumbImageFormat => ImageFormat.Png;
+    public Stream GetThumbImage() => typeof(Plugin).Assembly.GetManifestResourceStream("EmbyBlurayHelper.Plugin.thumbnail.png")
+        ?? throw new InvalidOperationException("The embedded plugin thumbnail is missing.");
 
     public override string Description => "Provides explicit Blu-ray media probing for ISO and BDMV sources.";
     public IEnumerable<PluginPageInfo> GetPages() => new[] {

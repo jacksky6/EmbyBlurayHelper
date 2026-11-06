@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#142946"/><stop offset=".58" stop-color="#0b182b"/><stop offset="1" stop-color="#07111e"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop stop-color="#1c9cc0" stop-opacity=".36"/><stop offset="1" stop-color="#1c9cc0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="disc" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#213e5c"/><stop offset=".27" stop-color="#b2e5f0"/>
+      <stop offset=".44" stop-color="#426780"/><stop offset=".58" stop-color="#142e4b"/>
+      <stop offset=".76" stop-color="#81d9df"/><stop offset="1" stop-color="#1d4a69"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#8cf2e0"/><stop offset="1" stop-color="#28bcd5"/>
+    </linearGradient>
+    <clipPath id="infuseClip"><rect x="877" y="543" width="92" height="92" rx="22"/></clipPath>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000a16" flood-opacity=".65"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" fill="url(#background)"/>
+  <circle cx="1010" cy="266" r="354" fill="url(#halo)"/>
+
+  <g font-family="Segoe UI, Arial, Microsoft YaHei, sans-serif">
+    <rect x="64" y="61" width="7" height="23" rx="3.5" fill="#70e6db"/>
+    <text x="88" y="81" fill="#a9c4d7" font-size="23" font-weight="600" letter-spacing="3">EMBY BLURAY HELPER</text>
+
+    <text x="58" y="246" fill="#f4f9ff" font-size="100" font-weight="750" letter-spacing="-3">BLU-RAY</text>
+    <rect x="64" y="287" width="178" height="72" rx="15" fill="url(#accent)"/>
+    <text x="153" y="338" text-anchor="middle" fill="#092433" font-size="48" font-weight="800" letter-spacing="1">UHD</text>
+    <text x="269" y="341" fill="#e4f4fb" font-size="54" font-weight="600" letter-spacing="3">原盘增强</text>
+    <text x="65" y="420" fill="#92b0c5" font-size="29" letter-spacing="2">BDMV · ISO</text>
+
+    <g filter="url(#shadow)">
+      <circle cx="991" cy="263" r="178" fill="url(#disc)" stroke="#9be8f5" stroke-opacity=".6" stroke-width="2"/>
+      <circle cx="991" cy="263" r="164" fill="none" stroke="#d8faff" stroke-opacity=".25"/>
+      <circle cx="991" cy="263" r="153" fill="none" stroke="#e6ffff" stroke-opacity=".12"/>
+      <path d="M856 170A164 164 0 0 1 1084 128" fill="none" stroke="#e5fbff" stroke-width="3" stroke-linecap="round" opacity=".6"/>
+      <path d="M1097 388A164 164 0 0 1 851 350" fill="none" stroke="#6ff3de" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+      <circle cx="991" cy="263" r="65" fill="#0a1b2e" fill-opacity=".62" stroke="#b9f5f7" stroke-opacity=".46"/>
+      <circle cx="991" cy="263" r="41" fill="#081626" stroke="#d7fdff" stroke-opacity=".64" stroke-width="2"/>
+      <circle cx="991" cy="263" r="30" fill="#0e2439"/>
+      <circle cx="1128" cy="382" r="43" fill="url(#accent)" stroke="#cafff6" stroke-opacity=".48" stroke-width="2"/>
+      <path d="M1128 364V400M1110 382H1146" fill="none" stroke="#103448" stroke-width="8" stroke-linecap="round"/>
+    </g>
+
+    <path d="M64 499H1216" fill="none" stroke="#a7d7ec" stroke-opacity=".17"/>
+    <text x="64" y="575" fill="#e5f2fb" font-size="35" font-weight="500" letter-spacing="3">语言 · 规格 · 章节</text>
+    <text x="66" y="621" fill="#86a8bf" font-size="23" letter-spacing="1">让原盘信息更完整，让播放更顺手</text>
+
+    <image x="877" y="543" width="92" height="92" clip-path="url(#infuseClip)" xlink:href="../../EmbyBlurayHelper.App/Web/infuse-icon.jpg"/>
+    <text x="992" y="581" fill="#f7faff" font-size="46" font-weight="600" letter-spacing="-.5">Infuse</text>
+    <text x="995" y="620" fill="#9db9cb" font-size="23" letter-spacing="4">播放增强</text>
+  </g>
+</svg>
