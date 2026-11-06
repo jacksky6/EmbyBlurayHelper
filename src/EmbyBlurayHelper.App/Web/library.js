@@ -144,7 +144,7 @@
     const pages = Math.max(1, Math.ceil(rows.length / size)); page = Math.max(0, Math.min(page, pages - 1));
     const hasItems = items.size > 0;
     $('#lib-details').style.display = hasItems ? '' : 'none';
-    $('#lib-table-count').textContent = rows.length + ' 部';
+    $('#lib-table-count').textContent = '共 ' + rows.length + ' 部';
     $('#lib-rows').innerHTML = rows.slice(page * size, page * size + size).map(i => `<tr><td><strong>${escapeHtml(i.name)}</strong><small>ID ${escapeHtml(i.id)}</small></td>${STEPS.map(s => `<td>${cell(s, i.id)}</td>`).join('')}</tr>`).join('')
       || '<tr><td colspan="4" class="empty">此范围没有影片</td></tr>';
     $('#lib-page').textContent = `${page + 1} / ${pages}`; $('#lib-prev').disabled = page === 0; $('#lib-next').disabled = page >= pages - 1;
