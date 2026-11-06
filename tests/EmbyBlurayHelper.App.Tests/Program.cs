@@ -103,6 +103,7 @@ try
     Check((await client.PostAsJsonAsync("api/chapters/batch/scan", new { })).StatusCode == HttpStatusCode.Unauthorized, "chapter scan requires login");
     Check((await client.PostAsJsonAsync("api/chapters/batch/fill", new {planId="fake"})).StatusCode == HttpStatusCode.Unauthorized, "chapter mutations require login");
     Check((await client.PostAsJsonAsync("api/library-language/scan", new { })).StatusCode == HttpStatusCode.Unauthorized, "library scan requires login");
+    Check((await client.GetAsync("api/library-tasks")).StatusCode == HttpStatusCode.Unauthorized && (await client.PostAsJsonAsync("api/library-tasks/fill", new { })).StatusCode == HttpStatusCode.Unauthorized, "combined library tasks require login");
     Check((await client.PostAsJsonAsync("api/infuse/multiclip", new { enabled = true })).StatusCode == HttpStatusCode.Unauthorized, "multi-clip toggle requires login");
     Check((await client.PostAsJsonAsync("api/logs/clear", new { })).StatusCode == HttpStatusCode.Unauthorized, "clearing logs requires login");
     Check((await client.PostAsJsonAsync("api/probe/discover", new { embyUrl = options.embyUrl, embyApiKey = "test-secret" })).StatusCode == HttpStatusCode.Unauthorized, "discovery requires management login");
@@ -321,6 +322,13 @@ try
     using var noCsrf = new HttpClient(new HttpClientHandler { UseCookies = false }) { BaseAddress = client.BaseAddress };
     noCsrf.DefaultRequestHeaders.Add("Cookie", cookies.GetCookieHeader(client.BaseAddress!));
     Check((await noCsrf.PostAsJsonAsync("api/library-language/scan", new { })).StatusCode == HttpStatusCode.Forbidden, "library task changes require the management request header");
+    Check((await noCsrf.PostAsJsonAsync("api/library-tasks/fill", new { libraryIds = new[] { "a" }, steps = new[] { new { task = "language", planId = "x" } } })).StatusCode == HttpStatusCode.Forbidden, "combined fill requires the management request header");
+    var pipelineIdle = JsonDocument.Parse(await client.GetStringAsync("api/library-tasks")).RootElement;
+    Check(pipelineIdle.GetProperty("status").GetString() == "idle" && !pipelineIdle.GetProperty("active").GetBoolean(), "combined task starts idle");
+    using (var noSteps = await client.PostAsJsonAsync("api/library-tasks/fill", new { libraryIds = new[] { "a" }, steps = Array.Empty<object>() }))
+        Check(noSteps.StatusCode == HttpStatusCode.BadRequest && (await noSteps.Content.ReadAsStringAsync()).Contains("补全内容"), "combined fill needs at least one task");
+    using (var noLibrary = await client.PostAsJsonAsync("api/library-tasks/fill", new { libraryIds = Array.Empty<string>(), steps = new[] { new { task = "language", planId = "x" } } }))
+        Check(noLibrary.StatusCode == HttpStatusCode.BadRequest && (await noLibrary.Content.ReadAsStringAsync()).Contains("媒体库"), "combined fill needs a library");
     Check((await noCsrf.PostAsJsonAsync("api/media-features/batch/fill", new { planId = "none", libraryIds = new[] { "a" } })).StatusCode == HttpStatusCode.Forbidden, "feature batch changes require the management request header");
     Check((await noCsrf.PostAsJsonAsync("api/logs/clear", new { })).StatusCode == HttpStatusCode.Forbidden && File.Exists(history), "clearing logs requires the management request header");
     if (OperatingSystem.IsWindows())

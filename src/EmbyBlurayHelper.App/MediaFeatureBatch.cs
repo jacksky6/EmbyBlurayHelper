@@ -16,6 +16,8 @@ internal sealed class MediaFeatureBatch : IAsyncDisposable
     private MediaFeaturePlan plan = new();
     private string FilePath => Path.Combine(settings.DataDirectory, "media-feature-task.json");
     private static bool Active(string status) => status is "scanning" or "filling" or "cancelling";
+    // Read by LibraryPipeline to chain fills without parsing the snapshot.
+    internal (bool Active, string Status, string Message) State { get { lock (gate) return (Active(plan.Status), plan.Status, plan.Message); } }
     private static bool Verified(FeatureMovie movie) => movie.Sources.Count > 0 && movie.Sources.All(s => s.VerifiedAt.HasValue);
 
     internal MediaFeatureBatch(SettingsStore settings, HttpClient client, HelperLog log,

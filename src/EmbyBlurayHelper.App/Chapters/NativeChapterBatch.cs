@@ -17,6 +17,8 @@ internal sealed class NativeChapterBatch : IAsyncDisposable
     private ChapterPlan plan = new();
     private string FilePath => Path.Combine(settings.DataDirectory, "native-chapter-task.json");
     private static bool Active(string s) => s is "scanning" or "filling" or "cancelling";
+    // Read by LibraryPipeline to chain fills without parsing the snapshot.
+    internal (bool Active, string Status, string Message) State { get { lock (gate) return (Active(plan.Status), plan.Status, plan.Message); } }
     private static bool Done(ChapterMovie m) => m.Sources.Count > 0 && m.Sources.All(s => s.State is "managed" or "existing");
     internal NativeChapterBatch(SettingsStore settings, HttpClient client, NativeChapterService service, HelperLog log)
     {

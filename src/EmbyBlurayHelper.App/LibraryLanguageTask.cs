@@ -22,6 +22,8 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
     private readonly TimeSpan mediaReadTimeout;
     private string FilePath => Path.Combine(settings.DataDirectory, "library-language-task.json");
     private static bool Active(string status) => status is "scanning" or "filling" or "cancelling";
+    // Read by LibraryPipeline to chain fills without parsing the snapshot.
+    internal (bool Active, string Status, string Message) State { get { lock (gate) return (Active(plan.Status), plan.Status, plan.Message); } }
 
     public LibraryLanguageTask(SettingsStore settings, HttpClient client, HelperLog log,
         TimeSpan? verificationTimeout = null, TimeSpan? pollInterval = null, IsoPrerequisites? isoPrerequisites = null,

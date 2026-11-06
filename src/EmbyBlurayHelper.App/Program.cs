@@ -143,6 +143,8 @@ await using var featureBatch = new MediaFeatureBatch(settings, libraryClient, lo
 await using var libraryTask = new LibraryLanguageTask(settings, libraryClient, log);
 var chapters = new NativeChapterService(settings, libraryClient, log);
 await using var chapterBatch = new NativeChapterBatch(settings, libraryClient, chapters, log);
+// Disposed before the three tasks it chains.
+await using var pipeline = new LibraryPipeline(libraryTask, featureBatch, chapterBatch, log);
 var app = builder.Build();
 app.UseWebSockets();
 var proxies = new Dictionary<ProxyConfiguration, EmbyProxy>();
@@ -268,6 +270,10 @@ app.MapPost("/api/media-features/batch/cancel", () => featureBatch.Cancel());
 app.MapGet("/api/chapters", (CancellationToken token) => chapters.Status(token));
 app.MapPost("/api/chapters", (ChapterSettingsInput input, CancellationToken token) => chapters.Configure(input.Enabled, input.ReaderPath, token));
 app.MapGet("/api/chapters/batch", () => chapterBatch.Snapshot());
+app.MapGet("/api/library-tasks", () => pipeline.Snapshot());
+app.MapPost("/api/library-tasks/scan", () => Results.Json(pipeline.ScanAll(), statusCode: 202));
+app.MapPost("/api/library-tasks/fill", (LibraryTasksInput input) => Results.Json(pipeline.Start(input.LibraryIds ?? [], input.Steps ?? []), statusCode: 202));
+app.MapPost("/api/library-tasks/cancel", () => pipeline.Cancel());
 app.MapPost("/api/chapters/batch/scan", () => Results.Json(chapterBatch.Scan(), statusCode: 202));
 app.MapPost("/api/chapters/batch/fill", (FeatureBatchInput input) => Results.Json(chapterBatch.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202));
 app.MapPost("/api/chapters/batch/cancel", () => chapterBatch.Cancel());
@@ -283,5 +289,6 @@ internal sealed record ProbeDiscoveryInput(string EmbyUrl, string EmbyApiKey);
 internal sealed record LibraryPlanInput(string PlanId, string[]? LibraryIds = null);
 internal sealed record MediaFeatureInput(bool Enabled, string ProbePath, bool? OriginalTrackTitles = null);
 internal sealed record FeatureProbeInput(string ProbePath);
+internal sealed record LibraryTasksInput(string[]? LibraryIds, LibraryPipeline.StepInput[]? Steps);
 internal sealed record FeatureBatchInput(string PlanId, string[]? LibraryIds = null, bool IncludeVerified = false);
 internal sealed record ChapterSettingsInput(bool Enabled, string? ReaderPath = null);
