@@ -145,8 +145,8 @@
     const hasItems = items.size > 0;
     $('#lib-details').style.display = hasItems ? '' : 'none';
     $('#lib-table-count').textContent = '共 ' + rows.length + ' 部';
-    $('#lib-rows').innerHTML = rows.slice(page * size, page * size + size).map(i => `<tr><td><strong>${escapeHtml(i.name)}</strong><small>ID ${escapeHtml(i.id)}</small></td>${STEPS.map(s => `<td>${cell(s, i.id)}</td>`).join('')}</tr>`).join('')
-      || '<tr><td colspan="4" class="empty">此范围没有影片</td></tr>';
+    $('#lib-rows').innerHTML = rows.slice(page * size, page * size + size).map(i => `<tr><td>${escapeHtml(i.id)}</td><td><strong>${escapeHtml(i.name)}</strong></td>${STEPS.map(s => `<td>${cell(s, i.id)}</td>`).join('')}</tr>`).join('')
+      || '<tr><td colspan="5" class="empty">此范围没有影片</td></tr>';
     $('#lib-page').textContent = `${page + 1} / ${pages}`; $('#lib-prev').disabled = page === 0; $('#lib-next').disabled = page >= pages - 1;
   }
   function showError(message) { if (message) toast(message, true); }
