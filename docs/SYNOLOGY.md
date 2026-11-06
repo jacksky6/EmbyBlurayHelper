@@ -6,7 +6,7 @@
 
 ## 安装与连接
 
-1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-22-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
+1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-23-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
 2. 打开 `http://NAS-IP:8099`，用户名 `admin`，密码 `123456`。也可从 DSM 的应用图标打开。
 3. 在 DSM「控制面板 → 共享文件夹 → 电影所在共享文件夹 → 编辑 → 权限」中，
    选择「系统内部用户」，给 `embyblurayhelper` **只读**权限。对所有需要读取的媒体共享文件夹重复此步骤。
@@ -62,6 +62,14 @@ Emby 调用 `probe.sh` 时，只读取单独导出的 `probe-settings.json`，�
 旧版“已接入但补全已暂停”的配置会保留，可打开开关重新启用，也可使用提示下的“恢复原探测器”操作。已接入表示 Emby 已配置为调用本工具，已有影片需再次发生实际媒体探测才会更新语言信息。
 
 ## 升级与卸载
+
+### 0.2.0-23：概览横幅与媒体库操作改进
+
+概览页新增 Emby / BlurayHelper / Infuse 横幅，产品图标随程序嵌入，无需浏览器联网加载；媒体库信息、功能状态、待办提醒和最近活动按区块展示，适配桌面与手机。随包提供 `BRAND-ASSETS.md` 记录图标来源。
+
+媒体库列表将影片 ID 独立为第一列，调整列宽和行高，增加悬停高亮并修正不可用分页按钮的鼠标样式。「语言与时长」支持选择「含已核验」，可对已有完整信息重新核验；统计区分电影总数、蓝光原盘、UHD 蓝光、1080P 蓝光和规格未识别的原盘。
+
+在套件中心直接手动安装本版 SPK 升级，**不要先卸载**。配置、登录账号、API key、日志和任务记录保留；端口不变。完成后打开 `http://NAS-IP:8099/#overview` 并强制刷新页面。随附 Emby 插件仍为 **0.1.6**，已加载该版本的无需替换 DLL 或重启 Emby；本次仅更新 Helper。
 
 ### 0.2.0-22：Infuse 原盘章节，管理页面重新整理
 
@@ -140,7 +148,7 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 # 发布后仅重新打包：
 .\scripts\build-synology.ps1 -SkipPublish
 # 下一次版本升级必须递增最后的套件构建号：
-.\scripts\build-synology.ps1 -Version 0.2.0-23
+.\scripts\build-synology.ps1 -Version 0.2.0-24
 ```
 
 打包使用现有 WSL `Ubuntu-26.04` 的 Python 标准库；无需额外安装 SPK SDK。
@@ -148,15 +156,15 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 Linux / GitHub Actions 在发布 `linux-x64` 后可直接运行：
 
 ```sh
-python3 scripts/package-synology.py --version 0.2.0-22
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-22-dsm7.2-x86_64.spk
+python3 scripts/package-synology.py --version 0.2.0-23
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-23-dsm7.2-x86_64.spk
 ```
 
 生命周期及跨用户探测测试可在 Linux 运行；加 `--cross-user` 时用 root 启动测试，
 测试会在临时目录内分别以现有的 `nobody`、`daemon` 身份模拟两个套件，不创建系统账号：
 
 ```sh
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-22-dsm7.2-x86_64.spk --lifecycle --cross-user
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-23-dsm7.2-x86_64.spk --lifecycle --cross-user
 ```
 
 打包依据群晖官方 [套件格式](https://help.synology.com/developer-guide/synology_package/INFO.html)、

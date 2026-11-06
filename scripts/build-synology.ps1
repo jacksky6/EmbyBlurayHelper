@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.0-22',
+    [string]$Version = '0.2.0-23',
     [string]$DotnetPath = 'E:\ProgramFiles\dotnet-8\dotnet.exe',
     [string]$Distribution = 'Ubuntu-26.04',
     [switch]$SkipPublish

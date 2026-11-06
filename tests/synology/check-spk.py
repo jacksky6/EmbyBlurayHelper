@@ -51,7 +51,7 @@ def validate(path):
         with tarfile.open(fileobj=io.BytesIO(packed), mode="r:gz") as payload:
             payload_names = set(payload.getnames())
             check({"EmbyBlurayHelper", "probe.sh", "ui/config", "READ-ME.md"} <= payload_names, "Executable, launcher, UI and guide included")
-            check({"LIBRARY-LANGUAGE.md", "MEDIA-FEATURES.md", "NATIVE-CHAPTERS.md", "DISC-THUMBNAILS.md", "ARCHITECTURE.md", "emby-plugin/EmbyBlurayHelper.Plugin.dll"} <= payload_names,
+            check({"LIBRARY-LANGUAGE.md", "MEDIA-FEATURES.md", "NATIVE-CHAPTERS.md", "DISC-THUMBNAILS.md", "ARCHITECTURE.md", "BRAND-ASSETS.md", "emby-plugin/EmbyBlurayHelper.Plugin.dll"} <= payload_names,
                   "ISO/feature plugin, usage and module documentation included")
             check(payload.extractfile("emby-plugin/EmbyBlurayHelper.Plugin.dll").read(2) == b"MZ", "Bundled Emby plugin is a .NET assembly")
             check({"licenses/BDInfo-LGPL-2.1.txt", "licenses/DiscUtils-MIT.txt"} <= payload_names, "All bundled library licenses included")
@@ -232,6 +232,15 @@ def lifecycle(path, packed, cross_user):
             hook("start-stop-status", "start")
             hook("start-stop-status", "status")
             login()
+            with client.open(f"http://127.0.0.1:{admin_port}/", timeout=10) as response:
+                overview = response.read()
+            check(b'class="overview-banner"' in overview and b'/emby-icon.png' in overview and b'/infuse-icon.jpg' in overview,
+                  "Packaged Linux service serves the current Emby/Infuse overview")
+            for route, content_type, signature in (("emby-icon.png", "image/png", b"\x89PNG\r\n\x1a\n"),
+                                                   ("infuse-icon.jpg", "image/jpeg", b"\xff\xd8\xff")):
+                with client.open(f"http://127.0.0.1:{admin_port}/{route}", timeout=10) as response:
+                    check(response.headers.get_content_type() == content_type and response.read().startswith(signature),
+                          "Packaged overview serves embedded product artwork: " + route)
             iso = api("iso/status")
             check(not iso["canProbe"] and iso["pluginState"] == "not-loaded" and iso["probeState"] == "unsupported",
                   "DSM service detects unloaded plugin and missing HTTP/TCP input without probing movies")
