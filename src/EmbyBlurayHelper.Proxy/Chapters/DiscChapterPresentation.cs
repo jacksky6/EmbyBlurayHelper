@@ -86,9 +86,10 @@ internal sealed record DiscChapterPresentation(VirtualUdfImage Image, string Sig
         return new(VirtualUdfImage.Create(files), signature, Path.GetFileName(selected.Path), chapters.Length)
         { sourceFiles = originals.Select(p => { var f = new FileInfo(p); return (f.FullName, f.Length, f.LastWriteTimeUtc.Ticks); }).ToArray() };
     }
-    // Discs often carry the feature twice: a regional menu entry with a short
-    // stream table next to the full one, with marks rounded a millisecond
-    // apart. Those are one branch; the player gets the fullest stream table.
+    // Discs often carry the feature twice: a commentary entry whose stream
+    // table keeps only the stereo and commentary tracks, next to the full one,
+    // with marks rounded a millisecond apart. Those are one branch; the player
+    // gets the fullest stream table, where commentary is one track among all.
     internal static Title Choose(IReadOnlyList<Title> titles, long runtime, long size)
     {
         var seconds = runtime / 10000000d;
