@@ -98,6 +98,14 @@ try
     Check((await client.PostAsJsonAsync("api/media-features/batch/scan", new { })).StatusCode == HttpStatusCode.Unauthorized, "feature batch scan requires login");
     Check((await client.GetAsync("/library.js")).IsSuccessStatusCode && (await client.GetAsync("/media-features.js")).StatusCode == HttpStatusCode.NotFound, "media library UI script is embedded and served; removed scripts are gone");
     Check((await client.GetAsync("/chapters.js")).IsSuccessStatusCode, "native chapter UI script is embedded and served");
+    foreach (var (route, type, signature) in new[] {
+        ("/emby-icon.png", "image/png", new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
+        ("/infuse-icon.jpg", "image/jpeg", new byte[] { 255, 216, 255 }) })
+    {
+        using var artwork = await client.GetAsync(route);
+        var bytes = await artwork.Content.ReadAsByteArrayAsync();
+        Check(artwork.IsSuccessStatusCode && artwork.Content.Headers.ContentType?.MediaType == type && bytes.Length > signature.Length && bytes.AsSpan().StartsWith(signature), "overview artwork is embedded and served with its native format: " + route);
+    }
     Check((await client.GetAsync("api/chapters")).StatusCode == HttpStatusCode.Unauthorized, "chapter status requires login");
     Check((await client.GetAsync("api/chapters/batch")).StatusCode == HttpStatusCode.Unauthorized, "chapter progress requires login");
     Check((await client.PostAsJsonAsync("api/chapters/batch/scan", new { })).StatusCode == HttpStatusCode.Unauthorized, "chapter scan requires login");

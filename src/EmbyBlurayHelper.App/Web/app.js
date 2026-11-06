@@ -265,7 +265,9 @@ function renderOverview() {
   const s = language?.summary, checked = !!s && (!!language.checkedAt || language.moviesChecked > 0);
   const pendingLanguage = checked ? s.missingMovies + s.unknownMovies : 0;
   $('#ov-discs').textContent = checked ? s.blurayMovies : '—';
-  $('#ov-discs-foot').textContent = checked ? `${language.moviesChecked} 部电影 · ${s.uhdMovies} 部 UHD` : '尚未检查媒体库';
+  const fullHd = s?.fullHdMovies ?? language?.items?.filter(i => i.format === 'Blu-ray').length;
+  const unclassified = s?.unclassifiedMovies ?? language?.items?.filter(i => !['UHD','Blu-ray'].includes(i.format)).length;
+  $('#ov-discs-foot').textContent = checked ? `${language.moviesChecked} 部电影 · UHD ${s.uhdMovies} · 1080P ${fullHd ?? '—'}${unclassified > 0 ? ` · 规格未识别 ${unclassified}` : ''}` : '尚未检查媒体库';
   $('#ov-language').textContent = checked ? `${s.completeMovies} / ${s.blurayMovies}` : '—';
   $('#ov-language-foot').textContent = checked ? (pendingLanguage ? `${pendingLanguage} 部待补全` : '全部完整') : '在「媒体库处理」检查媒体库';
   const c = chapterBatch?.id ? chapterBatch.summary : null, f = featureBatch?.id ? featureBatch.summary : null;
