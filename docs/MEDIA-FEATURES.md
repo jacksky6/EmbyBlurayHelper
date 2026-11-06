@@ -16,7 +16,8 @@
 
 ## 按媒体库批量处理已有原盘
 
-在「音视频规格」的「按媒体库补充规格」中：
+在「媒体库处理」中勾选「音视频规格」：
+
 
 1. 点击「检查媒体库」。这里只读取 Emby 已保存的信息，不扫描视频码流。
 2. 勾选所需媒体库，或全选。可以查看每库的原盘数、批量已核验数、待核验数；同一电影跨库只提交一次。
@@ -70,7 +71,7 @@ Emby 的自定义探测器入口仍指向 Helper，这是既有语言补全的�
 | `App/MediaFeatureCatalog.cs` | 媒体库分页、BDMV/ISO 范围、媒体源签名及保存结果的读回校验。 |
 | `App/MediaFeatureBatch.cs`、`MediaFeatureBatchModels.cs` | 独立批量任务、分库选择、去重、取消/继续、持久化进度。 |
 | `ProbeWrapper/MediaFeatures/MediaFeatureAttempt.cs`、`MediaFeatureReceipt.cs` | 汇总本次所有增强子探测的结果，为 Emby 插件提供新鲜的核验凭据。 |
-| `App/Web/media-features.js` | 规格批量任务页面交互与任务期间的进度读取，独立于语言任务。 |
+| `App/LibraryPipeline.cs`、`App/Web/library.js` | 「媒体库处理」：合并三项检查结果，按顺序在后台执行所选补全。 |
 | `Web/index.html`、`Web/app.js` | 独立一级页面与开关，不执行媒体解析。 |
 
 上述路径均相对于 `src/EmbyBlurayHelper.` 对应项目目录。规格证据解析、Emby 写库、管理页面与 Infuse 代理保持各自边界。

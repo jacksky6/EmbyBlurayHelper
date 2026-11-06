@@ -29,7 +29,7 @@ const { chromium } = require(process.argv[2]);
     // Mask only the screenshot; the real field remains plaintext for the user.
     const screenshot=async file=>page.screenshot({path:`artifacts/ui/${file}.png`,fullPage:true,mask:[page.locator('#api-key')],maskColor:'#e9e6fa'});
     await screenshot('overview');
-    for(const name of ['language','media-features','chapters','infuse','diagnostics','logs','connection']) {
+    for(const name of ['library','language','media-features','chapters','infuse','diagnostics','logs','connection']) {
       await page.locator(`[data-page="${name}"]`).click();
       await page.locator('#page-'+name).waitFor({state:'visible'});
       await screenshot(name);
@@ -78,6 +78,6 @@ const { chromium } = require(process.argv[2]);
     await page.locator('#login-form button').click();
     await page.locator('#console').waitFor({state:'visible'});
     if(await page.locator('#api-key').inputValue()!==saved.embyApiKey) throw new Error('Account save must preserve Emby API key');
-    console.log('Passed browser checks: username/password form login, saved plaintext API key after reload, account save and re-login, all eight views, switch saved on change and persisted, 7 audio / 12 subtitle tracks, Chinese language names, mobile layout; no JavaScript errors.');
+    console.log('Passed browser checks: username/password form login, saved plaintext API key after reload, account save and re-login, all nine views, switch saved on change and persisted, 7 audio / 12 subtitle tracks, Chinese language names, mobile layout; no JavaScript errors.');
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

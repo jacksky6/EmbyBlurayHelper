@@ -7,8 +7,8 @@ let probeChanging = false, settingsSaving = false;
 let logRevision = 0, logsClearing = false;
 let multiClipStatus = null, multiClipChanging = false, multiClipRevision = 0;
 let isoStatus = null, isoLoading = false, isoRequest = null, isoRevision = 0;
-const labels = { overview:'概览', language:'语言与时长', 'media-features':'音视频规格', chapters:'章节与截图', infuse:'播放增强', diagnostics:'单片检查', logs:'运行日志', connection:'连接与账号' };
-const groups = { overview:'工作空间', language:'Emby 媒体库', 'media-features':'Emby 媒体库', chapters:'Emby 媒体库', infuse:'Infuse 播放', diagnostics:'工具', logs:'工具', connection:'设置' };
+const labels = { overview:'概览', library:'媒体库处理', language:'语言与时长', 'media-features':'音视频规格', chapters:'章节与截图', infuse:'播放增强', diagnostics:'单片检查', logs:'运行日志', connection:'连接与账号' };
+const groups = { overview:'工作空间', library:'Emby 媒体库', language:'Emby 媒体库', 'media-features':'Emby 媒体库', chapters:'Emby 媒体库', infuse:'Infuse 播放', diagnostics:'工具', logs:'工具', connection:'设置' };
 let mediaFeatureBusy = false, mediaFeatureReady = false;
 // Overview-only snapshots; each page keeps its own live state.
 let overview = {}, overviewRequest = null, infuseChapters = null;
@@ -253,7 +253,7 @@ function renderOverview() {
   const probe = probeStatus?.state, plugin = iso?.pluginState;
   const needsSetup = !configuration.embyApiKey || probe === 'unknown';
   $('#setup-notice').hidden = !needsSetup;
-  const hero = $('#hero-action'); hero.dataset.goto = needsSetup ? 'connection' : 'language'; hero.firstChild.textContent = needsSetup ? '连接 Emby ' : '查看媒体库 ';
+  const hero = $('#hero-action'); hero.dataset.goto = needsSetup ? 'connection' : 'library'; hero.firstChild.textContent = needsSetup ? '连接 Emby ' : '查看媒体库 ';
   const dot = (id, state) => $('#' + id).className = 'status-dot' + (state === 'on' ? '' : state === 'warn' ? ' failed' : ' neutral');
   const emby = !configuration.embyApiKey ? '未配置' : !probe ? '读取中' : probe === 'unknown' ? '需要检查' : '已连接';
   $('#int-emby').textContent = emby; dot('int-emby-dot', emby === '已连接' ? 'on' : emby === '读取中' ? 'off' : 'warn');
@@ -267,12 +267,12 @@ function renderOverview() {
   $('#ov-discs').textContent = checked ? s.blurayMovies : '—';
   $('#ov-discs-foot').textContent = checked ? `${language.moviesChecked} 部电影 · ${s.uhdMovies} 部 UHD` : '尚未检查媒体库';
   $('#ov-language').textContent = checked ? `${s.completeMovies} / ${s.blurayMovies}` : '—';
-  $('#ov-language-foot').textContent = checked ? (pendingLanguage ? `${pendingLanguage} 部待补全` : '全部完整') : '在「语言与时长」检查媒体库';
+  $('#ov-language-foot').textContent = checked ? (pendingLanguage ? `${pendingLanguage} 部待补全` : '全部完整') : '在「媒体库处理」检查媒体库';
   const c = chapterBatch?.id ? chapterBatch.summary : null, f = featureBatch?.id ? featureBatch.summary : null;
   $('#ov-chapters').textContent = c ? `${c.verified + c.preserved} / ${c.discs}` : '—';
-  $('#ov-chapters-foot').textContent = c ? (c.pending ? `${c.pending} 部待补全` : '全部已有章节') : '在「章节与截图」检查媒体库';
+  $('#ov-chapters-foot').textContent = c ? (c.pending ? `${c.pending} 部待补全` : '全部已有章节') : '在「媒体库处理」检查媒体库';
   $('#ov-features').textContent = f ? `${f.verified} / ${f.discs}` : '—';
-  $('#ov-features-foot').textContent = f ? (f.pending ? `${f.pending} 部待核验` : '全部已核验') : '在「音视频规格」检查媒体库';
+  $('#ov-features-foot').textContent = f ? (f.pending ? `${f.pending} 部待核验` : '全部已核验') : '在「媒体库处理」检查媒体库';
   const featureOn = !!features && !features.error && features.enabled && features.automatic === true && features.probeAccessible && features.probeConnected;
   tag($('#features-state'), !features || features.error ? '无法确认' : featureOn ? '已启用 · 自动识别' : features.enabled ? '需要检查' : '已关闭', featureOn);
   const chapterOn = !!chapters && !chapters.error && chapters.ready && chapters.enabled && chapters.automatic;
@@ -285,11 +285,11 @@ function renderOverview() {
   if (configuration.enableMediaFeatures && probe && probe !== 'connected' && probe !== 'unknown') add('warn','「音视频规格」识别已开启，但 Emby 探测器未接入，新片不会自动识别。','language');
   if (['not-loaded','outdated'].includes(plugin)) add('warn',`Emby 插件${plugin === 'outdated' ? '版本过旧' : '未加载'}：ISO 补全、原盘章节和截图不可用。安装随包 DLL 并重启 Emby。`,'chapters');
   if (chapters && !chapters.error && chapters.ready && chapters.enabled !== chapters.automatic) add('warn','原盘章节开关与 Emby 插件不同步，请在「章节与截图」重新开关一次。','chapters');
-  for (const [task, name, page] of [[language,'语言与时长','language'],[chapterBatch,'章节','chapters'],[featureBatch,'规格','media-features']])
-    if (['failed','interrupted'].includes(task?.status)) add('warn',`上次${name}任务未完成，可在对应页面继续。`, page);
-  if (pendingLanguage) add('info',`${pendingLanguage} 部原盘的语言或时长待补全。`,'language');
-  if (c?.pending) add('info',`${c.pending} 部原盘的章节待补全。`,'chapters');
-  if (f?.pending) add('info',`${f.pending} 部原盘的规格待核验。`,'media-features');
+  for (const [task, name] of [[language,'语言与时长'],[chapterBatch,'章节'],[featureBatch,'规格']])
+    if (['failed','interrupted'].includes(task?.status)) add('warn',`上次${name}任务未完成，可在「媒体库处理」继续。`, 'library');
+  if (pendingLanguage) add('info',`${pendingLanguage} 部原盘的语言或时长待补全。`,'library');
+  if (c?.pending) add('info',`${c.pending} 部原盘的章节待补全。`,'library');
+  if (f?.pending) add('info',`${f.pending} 部原盘的规格待核验。`,'library');
   const unavailable = infuseChapters?.unavailable || [];
   if (configuration.enableInfuseChapters && unavailable.length) add('info',`${unavailable.length} 部原盘在 Infuse 中保留原播放方式（${unavailable.slice(0,2).map(u => u.name).join('、')}${unavailable.length > 2 ? ' 等' : ''}）。`,'infuse');
   $('#attention-list').innerHTML = !overview.loaded ? '<p class="empty">正在读取状态</p>'
@@ -324,7 +324,7 @@ action('#logout',async()=>{await api('logout',{});showLogin();});
 action('#clear-logs',async()=>{if(!await confirm('清除全部运行日志？','将删除本工具保存的全部运行日志，包括历史日志和当前页面中的记录，清除后无法恢复。配置和运行统计保持不变。','清除全部'))return;logsClearing=true;logRevision++;try{const result=await api('logs/clear',{});logEntries=[];renderLogs();toast(result.message);}finally{logsClearing=false;logRevision++;}});
 action('#refresh-status',async()=>{await Promise.all([refresh(),refreshProbeStatus(true),refreshMultiClipStatus(),refreshInfuseChapters()]);await loadOverview(true);await testEmby();toast('状态已更新。');});
 action('#refresh-connection',async()=>{await refreshProbeStatus(true);await testEmby();toast('连接状态已更新。');});
-action('#refresh-language',async()=>{isoRevision++;isoStatus=null;isoRequest=null;await Promise.all([refreshProbeStatus(true),languageBatch.refresh(),refreshIsoStatus()]);toast('状态已更新。');});
+action('#refresh-language',async()=>{isoRevision++;isoStatus=null;isoRequest=null;await Promise.all([refreshProbeStatus(true),refreshIsoStatus()]);toast('状态已更新。');});
 action('#refresh-infuse',async()=>{const saved=await api('settings');configuration=saved.settings;featureState();await Promise.all([refreshMultiClipStatus(),refreshInfuseChapters()]);toast('状态已更新。');});
 action('#refresh-probe',async()=>{await refreshProbeStatus(true);});
 $('#enable-probe').addEventListener('change',event=>setProbeEnabled(event.currentTarget.checked));
@@ -372,7 +372,7 @@ action('#inspect',async()=>{
 function renderInspection() {
   const { itemId, disc, language, features, chapters, infuse, featureReady } = inspection;
   const find = snapshot => snapshot?.items?.find(i => i.id === itemId);
-  const missing = page => `<p class="muted">不在上次的媒体库检查结果中。普通 MKV / MP4 不处理；原盘请先在「${labels[page]}」检查媒体库。</p>`;
+  const missing = page => `<p class="muted">不在上次的媒体库检查结果中。普通 MKV / MP4 不处理；原盘请先在「媒体库处理」检查媒体库。</p>`;
   const card = (title, page, body) => `<section class="inspect-card"><div class="inspect-card-heading"><h4>${title}</h4><button class="text-button accent" data-goto-inspect="${page}">${labels[page]} →</button></div>${body}</section>`;
   const l = find(language);
   const languageBody = !l ? missing('language') : `<p><span class="tag ${l.classification === 'complete' ? '' : 'off'}">${({complete:'信息完整',missing:'语言缺失',unknown:'信息不足',unsupported:'暂不支持'})[l.classification] || '待确认'}</span></p><p>时长：${renderLibraryDurations(l)}</p><p>缺失：音轨 ${l.missingAudio} · 字幕 ${l.missingSubtitles}</p>`;
@@ -439,46 +439,8 @@ function renderLibraryDurations(item) {
   if (!sources.length) return '未识别';
   return sources.map((s,index)=>`<span>${sources.length > 1 ? `版本 ${index+1} · ` : ''}${formatLibraryRuntime(s.runTimeTicks)}</span>`).join('<br>');
 }
-const languagePending = i => ['missing','unknown'].includes(i.classification);
-const probeReady = () => probeStatus?.state === 'connected' && probeStatus.languagePatchEnabled && !probeChanging && !probeLoading;
-const languageBatch = BatchPanel({
-  prefix:'library', mount:'library-batch', page:'language', api:'library-language', noun:'语言与时长', progress:true,
-  checked: task => !!task?.checkedAt || task?.moviesChecked > 0,
-  counts:[
-    { key:'discs', label:'原盘影片', idle:'尚未检查媒体库', value:t => t.summary.blurayMovies, foot:t => `${t.moviesChecked} 部电影 · ${t.summary.uhdMovies} 部 UHD` },
-    { key:'complete', label:'信息完整', idle:'轨道语言及时长均完整', value:t => t.summary.completeMovies, foot:() => '轨道语言及时长均完整' },
-    { key:'missing', label:'语言缺失', idle:'音轨与字幕分别统计', value:t => t.summary.missingMovies, foot:t => `音轨 ${t.summary.missingAudio} 条 · 字幕 ${t.summary.missingSubtitles} 条` },
-    { key:'unknown', label:'信息不足', idle:'需要重新探测后确认', value:t => t.summary.unknownMovies, foot:t => `${t.summary.missingRuntimeMovies || 0} 部缺少时长` }],
-  columns:[
-    { label:'电影', cell:l => `${l.moviesChecked}${l.scanComplete ? '' : ' / ' + l.moviesTotal}` },
-    { label:'原盘', cell:l => l.blurayMovies }, { label:'信息完整', cell:l => l.completeMovies },
-    { label:'语言缺失', cell:l => `${l.missingMovies}<small>音轨 ${l.missingAudio} · 字幕 ${l.missingSubtitles}</small>` },
-    { label:'信息不足', cell:l => l.unknownMovies }],
-  itemColumns:['信息状态','时长','缺失语言'], pendingLabel:'待补全', issuesLabel:'失败 / 仍有缺失',
-  pending: languagePending, issue: i => ['failed','partial','unverified'].includes(i.result),
-  meta: i => escapeHtml(i.format),
-  cells: i => [`<span class="tag ${i.classification === 'complete' ? '' : 'off'}">${({complete:'信息完整',missing:'语言缺失',unknown:'信息不足',unsupported:'暂不支持'})[i.classification] || '待确认'}</span>`,
-    renderLibraryDurations(i), `音轨 ${i.missingAudio} · 字幕 ${i.missingSubtitles}`],
-  results:{ pending:'等待补全', completed:'已核验成功' },
-  tally: t => `成功 ${t.completed} · 仍有缺失 ${t.partial} · 失败 / 未核验 ${t.failed} · 跳过 ${t.skipped}`,
-  ready: () => probeReady() && !settingsSaving,
-  // ISO needs the plugin and a readable ffprobe; BDMV in the same scope can still run.
-  plan: items => {
-    const iso = items.filter(i => i.sources?.some(s => s.isIso)).length, blocked = iso > 0 && (!isoStatus?.canProbe || isoLoading);
-    return blocked ? { runnable: items.length - iso, label:`仅补全 BDMV（${items.length - iso} 部）`,
-      note:`所选范围有 ${iso} 部 ISO 暂不提交探测，请先解决上方 ISO 前置检查提示。${items.length - iso ? `可先补全其余 ${items.length - iso} 部 BDMV。` : ''}` } : {};
-  },
-  note: task => !probeReady() ? '检查只读取 Emby 已保存的信息；补全前请开启上方「Emby 探测语言补全」并确认已接入。'
-    : task?.scanComplete ? '计划包含语言缺失、时长缺失和信息不足的原盘；按所选媒体库补全。' : '先检查媒体库，再按计划补全。语言及时长完整的原盘会自动跳过。',
-  beforeFill: async items => {
-    if (!items.some(i => i.sources?.some(s => s.isIso))) return true;
-    await refreshIsoStatus();
-    if (isoStatus?.canProbe || items.some(i => !i.sources?.some(s => s.isIso))) return true;
-    toast(isoStatus?.message || 'ISO 补全前置检查未通过。', true); return false;
-  },
-  onScanFinished: () => refreshIsoStatus().catch(() => {})
-});
-function renderLibraryTask() { renderIsoStatus(); languageBatch.render(); }
+// Probe and ISO status feed the media library page.
+function renderLibraryTask() { renderIsoStatus(); window.dispatchEvent(new Event('helper:status')); }
 $('#refresh-iso').addEventListener('click',()=>refreshIsoStatus());
 async function refreshMediaFeatures() {
   if (mediaFeatureBusy) return;

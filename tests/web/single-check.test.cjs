@@ -29,7 +29,7 @@ w.fetch = async (url, options) => {
   throw new Error('unexpected ' + url);
 };
 const evaluate = code => vm.runInContext(code, dom.getInternalVMContext());
-evaluate(web('batch.js') + '\n' + web('app.js').replace('startConsole().catch(()=>{});', ''));
+evaluate(web('app.js').replace('startConsole().catch(()=>{});', ''));
 evaluate("configuration={};");
 const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setTimeout(r, 0)); };
 (async () => {

@@ -96,7 +96,7 @@ try
     Check((await client.GetAsync("api/media-features")).StatusCode == HttpStatusCode.Unauthorized, "supplementary feature status requires management login");
     Check((await client.GetAsync("api/media-features/batch")).StatusCode == HttpStatusCode.Unauthorized, "feature batch progress requires login");
     Check((await client.PostAsJsonAsync("api/media-features/batch/scan", new { })).StatusCode == HttpStatusCode.Unauthorized, "feature batch scan requires login");
-    Check((await client.GetAsync("/media-features.js")).IsSuccessStatusCode, "feature batch UI script is embedded and served");
+    Check((await client.GetAsync("/library.js")).IsSuccessStatusCode && (await client.GetAsync("/media-features.js")).StatusCode == HttpStatusCode.NotFound, "media library UI script is embedded and served; removed scripts are gone");
     Check((await client.GetAsync("/chapters.js")).IsSuccessStatusCode, "native chapter UI script is embedded and served");
     Check((await client.GetAsync("api/chapters")).StatusCode == HttpStatusCode.Unauthorized, "chapter status requires login");
     Check((await client.GetAsync("api/chapters/batch")).StatusCode == HttpStatusCode.Unauthorized, "chapter progress requires login");

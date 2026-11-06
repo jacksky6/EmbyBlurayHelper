@@ -18,7 +18,7 @@ w.fetch = async (url, options) => {
   if (url.endsWith('/api/infuse/chapters')) return json(chapterSummary);
   return json({});
 };
-vm.runInContext(fs.readFileSync(path.join(root, 'src/EmbyBlurayHelper.App/Web/batch.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'src/EmbyBlurayHelper.App/Web/app.js'), 'utf8').replace('startConsole().catch(()=>{});', ''), dom.getInternalVMContext());
+vm.runInContext(fs.readFileSync(path.join(root, 'src/EmbyBlurayHelper.App/Web/app.js'), 'utf8').replace('startConsole().catch(()=>{});', ''), dom.getInternalVMContext());
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 (async () => {
   w.fillSettings({ settings: server, hasApiKey: true, executablePath: '/helper', dataDirectory: '/data' });
