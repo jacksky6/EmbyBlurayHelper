@@ -71,6 +71,7 @@ def build(version, published, output):
             add(payload, "probe.sh", source(TEMPLATE / "probe.sh"), 0o755)
             add(payload, "READ-ME.md", source(ROOT / "docs/SYNOLOGY.md"))
             add(payload, "BRAND-ASSETS.md", source(ROOT / "docs/BRAND-ASSETS.md"))
+            add(payload, "PLUGIN-UPDATES.md", source(ROOT / "docs/PLUGIN-UPDATES.md"))
             add(payload, "LIBRARY-LANGUAGE.md", source(ROOT / "docs/LIBRARY-LANGUAGE.md"))
             add(payload, "MEDIA-FEATURES.md", source(ROOT / "docs/MEDIA-FEATURES.md"))
             add(payload, "NATIVE-CHAPTERS.md", source(ROOT / "docs/NATIVE-CHAPTERS.md"))
@@ -109,7 +110,7 @@ def build(version, published, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.2.0-23")
+    parser.add_argument("--version", default="0.2.0-24")
     parser.add_argument("--published", type=Path, default=ROOT / "artifacts/app/linux-x64")
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts/downloads")
     arguments = parser.parse_args()

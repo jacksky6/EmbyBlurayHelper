@@ -1,0 +1,33 @@
+<div id="blurayHelperUpdatePage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/EmbyBlurayHelperUpdateJs">
+    <div data-role="content">
+        <div class="content-primary" style="max-width: 800px; margin: auto; padding-bottom: calc(6em + env(safe-area-inset-bottom, 0px));">
+            <h1>EmbyBlurayHelper</h1>
+            <p>从本机 Helper 获取插件新版，以 Emby 运行账号安装。首次安装本插件后，后续更新可以在这里完成。</p>
+            <div style="padding: 1.3em; border: 1px solid rgba(128,128,128,.3); border-radius: 12px; margin: 1.5em 0;">
+                <h2 style="margin-top: 0;">插件版本</h2>
+                <dl style="display: grid; grid-template-columns: 9em 1fr; gap: .8em; margin-bottom: 1.4em;">
+                    <dt>当前已加载</dt><dd data-update="loaded" style="margin: 0;">读取中</dd>
+                    <dt>磁盘已安装</dt><dd data-update="installed" style="margin: 0;">读取中</dd>
+                    <dt>Helper 提供版本</dt><dd data-update="available" style="margin: 0;">尚未检查</dd>
+                </dl>
+                <p data-update="status" role="status" aria-live="polite">正在读取状态。</p>
+                <p data-update="checked" class="fieldDescription"></p>
+                <div style="display: flex; gap: .8em; flex-wrap: wrap;">
+                    <button is="emby-button" type="button" class="raised button-submit" data-update="install" disabled><span>安装更新</span></button>
+                    <button is="emby-button" type="button" class="raised" data-update="refresh"><span>刷新状态</span></button>
+                </div>
+                <p class="fieldDescription">更新前校验程序集、版本和 SHA256，并备份旧 DLL。安装成功后需要手动重启 Emby Server；不会自动打断播放或重启服务器。</p>
+            </div>
+            <form data-update="form">
+                <h2>Helper 更新来源</h2>
+                <div class="inputContainer">
+                    <label class="inputLabel" for="blurayUpdateHelperUrl">Helper 地址</label>
+                    <input is="emby-input" id="blurayUpdateHelperUrl" data-update="source" type="url" required value="http://127.0.0.1:8099" autocomplete="off" spellcheck="false" />
+                    <div class="fieldDescription">填写 Emby 服务器能够访问的 Helper 管理地址。Windows、DSM 同机通常使用 http://127.0.0.1:8099；容器部署可填写容器间可达地址。不需要 Helper 的登录账号或 API key。</div>
+                </div>
+                <button is="emby-button" type="submit" class="raised"><span>保存并检查更新</span></button>
+            </form>
+            <p data-update="error" role="alert" style="color: #e57373; white-space: pre-wrap;" hidden></p>
+        </div>
+    </div>
+</div>

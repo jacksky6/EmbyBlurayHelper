@@ -11,6 +11,8 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../EmbyBlurayHelper.EmbyPlugin/EmbyBlurayHelper.EmbyPlugin.csproj" ReferenceOutputAssembly="false" OutputItemType="PluginUpdateAssembly" />
+    <Compile Include="../EmbyBlurayHelper.EmbyPlugin/Updates/PluginUpdateManifest.cs" Link="PluginUpdate/PluginUpdateManifest.cs" />
     <PackageReference Include="BDInfo" Version="0.8.0" />
     <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
     <Compile Include="../EmbyBlurayHelper.Proxy/EmbyProxy.cs" Link="Core/EmbyProxy.cs" />
@@ -32,4 +34,9 @@
     <EmbeddedResource Include="Web/*" />
     <Content Remove="Web/**" />
   </ItemGroup>
+  <Target Name="EmbedPluginUpdate" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <EmbeddedResource Include="@(PluginUpdateAssembly)" LogicalName="EmbyBlurayHelper.App.PluginUpdate.dll" />
+    </ItemGroup>
+  </Target>
 </Project>

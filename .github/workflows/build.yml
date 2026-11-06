@@ -32,6 +32,8 @@ jobs:
         run: dotnet run --project tests/EmbyBlurayHelper.Library.Tests -c Release
       - name: Verify Emby plugin stream preservation
         run: dotnet run --project tests/EmbyBlurayHelper.EmbyPlugin.Tests -c Release
+      - name: Verify plugin update validation and atomic replacement
+        run: dotnet run --project tests/EmbyBlurayHelper.PluginUpdate.Tests -c Release
       - name: Verify native chapter tasks
         run: dotnet run --project tests/EmbyBlurayHelper.Chapters.Tests -c Release
       - name: Verify native thumbnail scheduling
@@ -48,6 +50,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/helper-ui" jsdom@26.1.0 --no-save --package-lock=false --ignore-scripts
           node tests/web/library-language.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
           node tests/web/native-chapters.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
+          node tests/web/plugin-update.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
       - name: Publish unified Web console
         run: >-
           dotnet publish src/EmbyBlurayHelper.App -c Release
@@ -65,7 +68,7 @@ jobs:
         if: matrix.rid == 'linux-x64'
         run: |
           python3 scripts/package-synology.py
-          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-23-dsm7.2-x86_64.spk --lifecycle
+          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-24-dsm7.2-x86_64.spk --lifecycle
       - uses: actions/upload-artifact@v4
         if: matrix.rid == 'linux-x64'
         with:

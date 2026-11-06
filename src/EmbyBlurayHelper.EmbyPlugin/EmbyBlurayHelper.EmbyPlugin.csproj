@@ -5,10 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>EmbyBlurayHelper.Plugin</AssemblyName>
-    <Version>0.1.6</Version>
+    <Version>0.1.7</Version>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Web/update.html" LogicalName="EmbyBlurayHelper.Plugin.update.html" />
+    <EmbeddedResource Include="Web/update.js" LogicalName="EmbyBlurayHelper.Plugin.update.js" />
     <Compile Include="../EmbyBlurayHelper.ProbeWrapper/MediaFeatures/MediaFeatureReceipt.cs" Link="MediaFeatures/MediaFeatureReceipt.cs" />
   </ItemGroup>
   <ItemGroup Condition="Exists('$(EmbyInstallPath)\MediaBrowser.Controller.dll')">

@@ -206,6 +206,16 @@ app.Use(async (context, next) =>
 foreach (var (route, name, type) in new[] { ("/", "index.html", "text/html; charset=utf-8"), ("/app.css", "app.css", "text/css"), ("/app.js", "app.js", "text/javascript"), ("/library.js", "library.js", "text/javascript"), ("/chapters.js", "chapters.js", "text/javascript"),
     ("/emby-icon.png", "emby-icon.png", "image/png"), ("/infuse-icon.jpg", "infuse-icon.jpg", "image/jpeg") })
     app.MapGet(route, () => Results.Stream(Assembly.GetExecutingAssembly().GetManifestResourceStream("EmbyBlurayHelper.App.Web." + name)!, type));
+// Public distribution of one embedded, non-secret DLL. All installation happens in Emby as an administrator action.
+var pluginUpdate = new Lazy<BundledPluginUpdate>(() => new BundledPluginUpdate());
+app.MapGet("/plugin-update/manifest.json", () => {
+    log.Add("Info", "PluginUpdate", "Emby 插件更新清单：" + pluginUpdate.Value.Manifest.Version);
+    return Results.Json(pluginUpdate.Value.Manifest);
+});
+app.MapGet("/plugin-update/EmbyBlurayHelper.Plugin.dll", () => {
+    log.Add("Info", "PluginUpdate", "提供 Emby 插件更新文件：" + pluginUpdate.Value.Manifest.Version);
+    return Results.Bytes(pluginUpdate.Value.Binary, "application/octet-stream", "EmbyBlurayHelper.Plugin.dll");
+});
 app.MapPost("/api/login", async (LoginInput input, HttpContext context) =>
 {
     var account = accounts.Current;

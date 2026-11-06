@@ -8,18 +8,29 @@ using MediaBrowser.Model.Plugins;
 
 namespace EmbyBlurayHelper.EmbyPlugin;
 
-public sealed class Plugin : BasePlugin<HelperPluginConfiguration>
+public sealed class Plugin : BasePlugin<HelperPluginConfiguration>, IHasWebPages
 {
     public static Plugin Instance { get; private set; } = null!;
     internal static readonly SemaphoreSlim ProbeGate = new(1, 1);
-    public Plugin(IApplicationPaths paths, IXmlSerializer serializer) : base(paths, serializer) { Instance = this; }
+    internal Updates.PluginUpdater Updater { get; }
+    public Plugin(IApplicationPaths paths, IXmlSerializer serializer) : base(paths, serializer)
+    {
+        Instance = this;
+        Updater = new Updates.PluginUpdater(paths.PluginsPath, typeof(Plugin).Assembly.GetName().Version!);
+    }
     public override string Name => "EmbyBlurayHelper";
 
     public override string Description => "Provides explicit Blu-ray media probing for ISO and BDMV sources.";
+    public IEnumerable<PluginPageInfo> GetPages() => new[] {
+        new PluginPageInfo { Name = "EmbyBlurayHelperUpdate", DisplayName = "EmbyBlurayHelper", IsMainConfigPage = true,
+            EmbeddedResourcePath = "EmbyBlurayHelper.Plugin.update.html" },
+        new PluginPageInfo { Name = "EmbyBlurayHelperUpdateJs", EmbeddedResourcePath = "EmbyBlurayHelper.Plugin.update.js" }
+    };
 }
 
 public sealed class HelperPluginConfiguration : BasePluginConfiguration
 {
+    public string UpdateHelperUrl { get; set; } = "http://127.0.0.1:8099";
     public bool EnableAutomaticMediaFeatures { get; set; }
     public List<string> AutomaticFeatureChecks { get; set; } = new();
     public bool EnableNativeChapters { get; set; }

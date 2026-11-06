@@ -9,6 +9,8 @@
 
 ## Windows
 
+Emby 插件从 **0.1.7** 起提供自己的更新配置页：先升级 Helper，再在 Emby「插件 → EmbyBlurayHelper」中检查并安装配套 DLL。首次仍需手动安装支持更新的 DLL，此后不必每次 SSH 复制；成功后手动重启 Emby 生效。默认更新来源为同机 `http://127.0.0.1:8099`，无需 Helper 密码。详见 [插件更新](PLUGIN-UPDATES.md)。
+
 解压后运行 `EmbyBlurayHelper.exe`。浏览器打开 `http://localhost:8099`。
 默认用户名 `admin`，默认密码 `123456`。登录后可在“Emby 连接 → 管理账号”中修改用户名和密码。
 账号明文保存在 `data/account.json`，与 Emby 账号独立；修改后需重新登录。

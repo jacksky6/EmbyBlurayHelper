@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Updates/PluginUpdater.cs" Link="PluginUpdater.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.EmbyPlugin/Updates/PluginUpdateManifest.cs" Link="PluginUpdateManifest.cs" />
+    <ProjectReference Include="../EmbyBlurayHelper.PluginUpdate.Fixture/Fixture.csproj" ReferenceOutputAssembly="false" OutputItemType="OldPluginFixture" />
+    <ProjectReference Include="../../src/EmbyBlurayHelper.EmbyPlugin/EmbyBlurayHelper.EmbyPlugin.csproj" ReferenceOutputAssembly="false" OutputItemType="NewPluginFixture" />
+  </ItemGroup>
+  <Target Name="CopyPluginFixtures" AfterTargets="Build">
+    <Copy SourceFiles="@(OldPluginFixture)" DestinationFiles="$(OutDir)old-plugin.dll" />
+    <Copy SourceFiles="@(NewPluginFixture)" DestinationFiles="$(OutDir)update-plugin.dll" />
+  </Target>
+  <Target Name="PublishPluginFixtures" AfterTargets="Publish">
+    <Copy SourceFiles="@(OldPluginFixture)" DestinationFiles="$(PublishDir)old-plugin.dll" />
+    <Copy SourceFiles="@(NewPluginFixture)" DestinationFiles="$(PublishDir)update-plugin.dll" />
+  </Target>
+</Project>

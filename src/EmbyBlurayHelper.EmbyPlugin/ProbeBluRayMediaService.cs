@@ -28,7 +28,7 @@ public sealed partial class BlurayHelperService : BaseApiService
     {
         status = "ready",
         version = typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "unknown",
-        capabilities = new[] { "media-streams", "missing-runtime", "missing-size", "bdmv-direct-probe", "playlist-repair", "media-features", "automatic-media-features", "media-features-verification", "native-chapters", "disc-thumbnails-emby-settings" }
+        capabilities = new[] { "media-streams", "missing-runtime", "missing-size", "bdmv-direct-probe", "playlist-repair", "media-features", "automatic-media-features", "media-features-verification", "native-chapters", "disc-thumbnails-emby-settings", "plugin-self-update" }
     };
 
     public object Get(MediaFeatureConfigurationRequest request) => new

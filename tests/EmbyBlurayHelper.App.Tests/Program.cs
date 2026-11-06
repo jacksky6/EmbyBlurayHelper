@@ -98,6 +98,16 @@ try
     Check((await client.PostAsJsonAsync("api/media-features/batch/scan", new { })).StatusCode == HttpStatusCode.Unauthorized, "feature batch scan requires login");
     Check((await client.GetAsync("/library.js")).IsSuccessStatusCode && (await client.GetAsync("/media-features.js")).StatusCode == HttpStatusCode.NotFound, "media library UI script is embedded and served; removed scripts are gone");
     Check((await client.GetAsync("/chapters.js")).IsSuccessStatusCode, "native chapter UI script is embedded and served");
+    var updateManifestResponse = await client.GetAsync("/plugin-update/manifest.json");
+    var updateManifestJson = await updateManifestResponse.Content.ReadAsStringAsync();
+    Check(updateManifestResponse.IsSuccessStatusCode, "embedded plugin update manifest is available: " + (updateManifestResponse.IsSuccessStatusCode ? "OK" : updateManifestJson));
+    var updateManifest = JsonDocument.Parse(updateManifestJson).RootElement;
+    var updateBinary = await client.GetByteArrayAsync("/plugin-update/EmbyBlurayHelper.Plugin.dll");
+    Check(updateManifest.GetProperty("assemblyName").GetString() == "EmbyBlurayHelper.Plugin" && updateManifest.GetProperty("version").GetString() == "0.1.7" &&
+        updateManifest.GetProperty("schemaVersion").GetInt32() == 1 && updateManifest.GetProperty("size").GetInt64() == updateBinary.Length &&
+        updateManifest.GetProperty("sha256").GetString() == Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(updateBinary)).ToLowerInvariant() &&
+        updateBinary.AsSpan(0, 2).SequenceEqual(new byte[] { 77, 90 }), "anonymous update source serves only the matching embedded plugin and verified manifest");
+    Check((await client.GetAsync("/plugin-update/settings.json")).StatusCode == HttpStatusCode.NotFound, "update source cannot expose arbitrary workstation files");
     foreach (var (route, type, signature) in new[] {
         ("/emby-icon.png", "image/png", new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
         ("/infuse-icon.jpg", "image/jpeg", new byte[] { 255, 216, 255 }) })

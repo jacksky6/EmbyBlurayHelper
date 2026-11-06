@@ -51,7 +51,7 @@ def validate(path):
         with tarfile.open(fileobj=io.BytesIO(packed), mode="r:gz") as payload:
             payload_names = set(payload.getnames())
             check({"EmbyBlurayHelper", "probe.sh", "ui/config", "READ-ME.md"} <= payload_names, "Executable, launcher, UI and guide included")
-            check({"LIBRARY-LANGUAGE.md", "MEDIA-FEATURES.md", "NATIVE-CHAPTERS.md", "DISC-THUMBNAILS.md", "ARCHITECTURE.md", "BRAND-ASSETS.md", "emby-plugin/EmbyBlurayHelper.Plugin.dll"} <= payload_names,
+            check({"LIBRARY-LANGUAGE.md", "MEDIA-FEATURES.md", "NATIVE-CHAPTERS.md", "DISC-THUMBNAILS.md", "ARCHITECTURE.md", "BRAND-ASSETS.md", "PLUGIN-UPDATES.md", "emby-plugin/EmbyBlurayHelper.Plugin.dll"} <= payload_names,
                   "ISO/feature plugin, usage and module documentation included")
             check(payload.extractfile("emby-plugin/EmbyBlurayHelper.Plugin.dll").read(2) == b"MZ", "Bundled Emby plugin is a .NET assembly")
             check({"licenses/BDInfo-LGPL-2.1.txt", "licenses/DiscUtils-MIT.txt"} <= payload_names, "All bundled library licenses included")
@@ -232,6 +232,15 @@ def lifecycle(path, packed, cross_user):
             hook("start-stop-status", "start")
             hook("start-stop-status", "status")
             login()
+            with client.open(f"http://127.0.0.1:{admin_port}/plugin-update/manifest.json", timeout=10) as response:
+                manifest = json.load(response)
+            with client.open(f"http://127.0.0.1:{admin_port}/plugin-update/EmbyBlurayHelper.Plugin.dll", timeout=10) as response:
+                update_binary = response.read()
+            with tarfile.open(fileobj=io.BytesIO(packed), mode="r:gz") as payload:
+                check(update_binary == payload.extractfile("emby-plugin/EmbyBlurayHelper.Plugin.dll").read(),
+                      "Embedded update DLL exactly matches the SPK's manually installable DLL")
+            check(manifest["version"] == "0.1.7" and manifest["size"] == len(update_binary) and
+                  manifest["sha256"] == hashlib.sha256(update_binary).hexdigest(), "DSM serves the verified plugin update manifest")
             with client.open(f"http://127.0.0.1:{admin_port}/", timeout=10) as response:
                 overview = response.read()
             check(b'class="overview-banner"' in overview and b'/emby-icon.png' in overview and b'/infuse-icon.jpg' in overview,
