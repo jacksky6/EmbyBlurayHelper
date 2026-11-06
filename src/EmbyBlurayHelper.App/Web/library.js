@@ -5,14 +5,15 @@
 (() => {
   let pipeline = null, snaps = {}, featureStatus = null, chapterStatus = null, timer, request = null, revision = 0, busy = false, page = 0;
   let planKey = '', selected = new Set(), chosen = {}, again = {};
+  let hideProgressTimer = null;
   const STEPS = [
     { key:'language', name:'语言与时长', page:'language', api:'library-language', pending:i => ['missing','unknown'].includes(i.classification),
       done:i => i.classification === 'complete', missing:i => i.classification === 'missing' ? `缺音轨 ${i.missingAudio} · 字幕 ${i.missingSubtitles}` : i.classification === 'unknown' ? '信息不足' : '暂不支持',
       known:() => !!probeStatus && probeStatus.state !== 'checking', blocked:() => !(probeStatus?.state === 'connected' && probeStatus.languagePatchEnabled) ? '需要在「语言与时长」开启「Emby 探测语言补全」并确认已接入。' : '',
       note:items => { const iso = items.filter(i => i.sources?.some(s => s.isIso)).length; return iso && isoStatus && !isoStatus.canProbe ? `${iso} 部 ISO 因插件或 ffprobe 条件未满足将跳过，其余 BDMV 照常补全。` : ''; } },
-    { key:'features', name:'音视频规格', page:'media-features', api:'media-features/batch', recheck:'重新核验已完成的原盘', pending:i => !i.verified, done:i => i.verified, missing:() => '待核验',
+    { key:'features', name:'音视频规格', page:'media-features', api:'media-features/batch', recheck:'含已核验的', pending:i => !i.verified, done:i => i.verified, missing:() => '待核验',
       known:() => !!featureStatus, blocked:() => { const f = featureStatus; return !f || f.error ? '无法读取规格识别状态。' : !(f.enabled && f.automatic === true && f.probeAccessible && f.probeConnected) ? '需要在「音视频规格」开启规格识别并配置增强 ffprobe。' : ''; } },
-    { key:'chapters', name:'原盘章节', page:'chapters', api:'chapters/batch', recheck:'重新核验已完成的原盘（仍保留自定义章节）', pending:i => i.pending, done:i => !i.pending, missing:() => '待补全',
+    { key:'chapters', name:'原盘章节', page:'chapters', api:'chapters/batch', recheck:'含已核验的', pending:i => i.pending, done:i => !i.pending, missing:() => '待补全',
       known:() => !!chapterStatus, blocked:() => { const c = chapterStatus; return !c || c.error ? '无法读取原盘章节状态。' : !c.ready ? '需要 Emby 插件 0.1.5 或更新版本。' : !(c.enabled && c.automatic) ? '需要在「章节与截图」开启「原盘章节补全」。' : ''; } }];
   const visible = () => !document.hidden && !!configuration && !$('#console').hidden && location.hash === '#library';
   const running = () => !!pipeline?.active;
@@ -34,7 +35,6 @@
     const groups = libraries(), key = STEPS.map(s => snaps[s.key]?.id || '').join('|');
     if (running()) { selected = new Set(pipeline.libraryIds); return; }
     if (key !== planKey) { planKey = key; selected = new Set(groups.map(l => l.id)); chosen = {}; }
-    // Default each step once its plan and its readiness status are both known.
     for (const s of STEPS) if (chosen[s.key] === undefined && valid(s) && s.known()) chosen[s.key] = runnable(s);
   }
   function stepState(s) {
@@ -52,30 +52,73 @@
   function render() {
     syncSelection();
     const locked = busy || anyActive(), groups = libraries(), lang = snaps.language?.summary;
-    $('#lib-count-discs').textContent = lang ? lang.blurayMovies : snaps.features?.summary?.discs ?? '—';
-    $('#lib-count-discs-foot').textContent = lang ? `${snaps.language.moviesChecked} 部电影 · ${lang.uhdMovies} 部 UHD` : '尚未检查媒体库';
-    $('#lib-count-language').textContent = lang ? lang.missingMovies + lang.unknownMovies : '—';
-    $('#lib-count-features').textContent = snaps.features?.summary?.pending ?? '—';
-    $('#lib-count-chapters').textContent = snaps.chapters?.summary?.pending ?? '—';
-    $('#lib-scope').hidden = !groups.length;
-    const count = groups.filter(l => selected.has(l.id)).length, all = $('#lib-select-all');
-    all.checked = !!groups.length && count === groups.length; all.indeterminate = count > 0 && count < groups.length; all.disabled = locked;
-    $('#lib-groups').innerHTML = groups.map(l => `<tr><td><label><input type="checkbox" data-library="${escapeHtml(l.id)}" ${selected.has(l.id) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${escapeHtml(l.name)}</span></label></td><td>${l.movies}</td><td>${l.discs}</td>${STEPS.map(s => `<td>${l.pending[s.key] ?? '—'}</td>`).join('')}</tr>`).join('');
-    $('#lib-selection').textContent = `已选 ${count} / ${groups.length} 个媒体库。待处理数量跨库只计一次。`;
-    $('#lib-steps').innerHTML = STEPS.map(s => {
-      const st = stepState(s), can = runnable(s) && !locked;
-      return `<div class="lib-step" data-state="${st.state}"><label class="lib-step-main"><input type="checkbox" data-step="${s.key}" ${chosen[s.key] && runnable(s) ? 'checked' : ''} ${can ? '' : 'disabled'}><span><strong>${s.name}</strong><small>${escapeHtml(st.detail)}</small></span></label><span class="tag ${st.state === 'on' ? '' : 'off'}">${escapeHtml(st.text)}</span><button class="text-button accent" data-goto-step="${s.page}">设置 →</button>${s.recheck ? `<label class="feature-batch-recheck lib-step-recheck"><input type="checkbox" data-again="${s.key}" ${again[s.key] ? 'checked' : ''} ${locked || !valid(s) ? 'disabled' : ''}>${s.recheck}</label>` : ''}</div>`;
+    const discs = lang ? lang.blurayMovies : (snaps.features?.summary?.discs ?? null);
+    const movies = snaps.language?.moviesChecked ?? null;
+    const uhd = lang?.uhdMovies ?? null;
+    $('#lib-action-summary').textContent = discs !== null
+      ? `${discs} 部原盘 · ${movies ?? '?'} 部电影 · ${uhd ?? '?'} 部 UHD`
+      : '尚未检查媒体库';
+    const libsEl = $('#lib-action-libs');
+    if (groups.length >= 2) {
+      libsEl.hidden = false;
+      const allSel = groups.every(l => selected.has(l.id));
+      libsEl.innerHTML = `<button class="lib-action-libs-toggle" id="lib-select-all-link">${allSel ? '取消全选' : '全选'}</button>`
+        + groups.map(l => `<label><input type="checkbox" data-library="${escapeHtml(l.id)}" ${selected.has(l.id) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${escapeHtml(l.name)}</span></label>`).join('');
+    } else {
+      libsEl.hidden = true;
+    }
+    $('#lib-scan').disabled = locked;
+    $('#lib-fill-rows').innerHTML = STEPS.map(s => {
+      const st = stepState(s);
+      const can = runnable(s) && !locked;
+      const recheckDisabled = locked || !valid(s) ? 'disabled' : '';
+      return `<div class="lib-fill-row" data-state="${st.state}">` +
+        `<input type="checkbox" data-step="${s.key}" ${chosen[s.key] && runnable(s) ? 'checked' : ''} ${can ? '' : 'disabled'}>` +
+        `<span class="lib-fill-row-name">${s.name}</span>` +
+        `<span class="lib-fill-row-count ${st.state === 'on' ? 'on' : ''}">${escapeHtml(st.text)}</span>` +
+        `<button class="text-button" data-goto-step="${s.page}">设置 →</button>` +
+        (s.recheck ? `<label class="lib-fill-row-recheck"><input type="checkbox" data-again="${s.key}" ${again[s.key] ? 'checked' : ''} ${recheckDisabled}>${s.recheck}</label>` : '') +
+        (st.detail ? `<small class="lib-fill-row-detail">${escapeHtml(st.detail)}</small>` : '') +
+        `</div>`;
     }).join('');
-    const picked = STEPS.filter(s => chosen[s.key] && runnable(s)), total = picked.reduce((n, s) => n + eligible(s).length, 0);
-    $('#lib-fill').disabled = locked || !count || !picked.length;
-    $('#lib-fill').textContent = picked.length ? `补全所选内容（${picked.map(s => s.name).join(' → ')}，共 ${total} 项）` : '补全所选内容';
-    $('#lib-scan').disabled = locked; $('#lib-cancel').hidden = !running(); $('#lib-cancel').disabled = busy || pipeline?.status === 'cancelling';
-    const box = $('#lib-status'), current = STEPS.find(s => s.key === pipeline?.current), task = current && snaps[current.key];
-    const title = running() ? (pipeline.status === 'cancelling' ? '正在停止' : `正在补全：${current?.name || '准备中'}`) : STEPS.some(s => snaps[s.key]?.status === 'scanning') ? '正在检查媒体库'
-      : pipeline?.status === 'completed' ? '上次补全已结束' : pipeline?.status === 'cancelled' ? '上次补全已停止' : '尚未开始';
-    const progress = task?.planned ? `${task.processed} / ${task.planned} 部${task.currentName ? ' · 当前：' + task.currentName : ''}` : '';
-    setStatus(box, running() || STEPS.some(s => snaps[s.key]?.active) ? 'warn' : pipeline?.status === 'completed' ? 'on' : 'off', title,
-      [running() ? progress || task?.message : pipeline?.message, '进度仅在任务运行且此页面可见时自动刷新。'].filter(Boolean).join(' '));
+    const picked = STEPS.filter(s => chosen[s.key] && runnable(s));
+    $('#lib-fill').disabled = locked || !selected.size || !picked.length;
+    $('#lib-fill').textContent = '开始补全';
+    $('#lib-cancel').hidden = !running();
+    $('#lib-cancel').disabled = busy || pipeline?.status === 'cancelling';
+    const libFilterEl = $('#lib-lib-filter');
+    if (libFilterEl) {
+      const curVal = libFilterEl.value;
+      libFilterEl.innerHTML = '<option value="">全部媒体库</option>'
+        + groups.map(l => `<option value="${escapeHtml(l.id)}" ${curVal === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`).join('');
+    }
+    const progressRow = $('#lib-progress-row');
+    const currentStep = STEPS.find(s => s.key === pipeline?.current);
+    const task = currentStep && snaps[currentStep.key];
+    if (running()) {
+      clearTimeout(hideProgressTimer); hideProgressTimer = null;
+      progressRow.hidden = false;
+      progressRow.removeAttribute('data-done');
+      $('#lib-progress-title').textContent = currentStep?.name || '准备中';
+      const processed = task?.processed ?? 0, planned = task?.planned ?? 0;
+      $('#lib-progress-count').textContent = planned ? `${processed} / ${planned}` : '';
+      const bar = $('#lib-progress-bar');
+      bar.hidden = false; bar.value = processed; bar.max = Math.max(1, planned);
+      $('#lib-progress-current').textContent = task?.currentName || '';
+    } else if ((pipeline?.status === 'completed' || pipeline?.status === 'cancelled') && pipeline?.message) {
+      progressRow.hidden = false;
+      $('#lib-progress-title').textContent = pipeline.status === 'completed' ? '补全已完成' : '已停止';
+      $('#lib-progress-count').textContent = pipeline.message;
+      $('#lib-progress-bar').hidden = true;
+      $('#lib-progress-current').textContent = '';
+      if (!progressRow.dataset.done) {
+        progressRow.dataset.done = '1';
+        clearTimeout(hideProgressTimer);
+        hideProgressTimer = setTimeout(() => { progressRow.hidden = true; }, 8000);
+      }
+    } else if (!pipeline || pipeline.status === 'idle') {
+      if (!hideProgressTimer) progressRow.hidden = true;
+    }
     renderRows();
   }
   function cell(s, id) {
@@ -87,18 +130,26 @@
   function renderRows() {
     const items = new Map();
     for (const s of STEPS) for (const i of inScope(s)) if (!items.has(i.id)) items.set(i.id, i);
-    const filter = $('#lib-filter').value, issue = id => STEPS.some(s => ['failed','partial','unverified'].includes(snaps[s.key]?.items?.find(x => x.id === id)?.result));
+    const filter = $('#lib-filter').value;
+    const libFilter = $('#lib-lib-filter')?.value || '';
+    const issue = id => STEPS.some(s => ['failed','partial','unverified'].includes(snaps[s.key]?.items?.find(x => x.id === id)?.result));
     const pendingAny = id => STEPS.some(s => { const i = valid(s) && snaps[s.key].items.find(x => x.id === id); return i && s.pending(i); });
-    const rows = [...items.values()].filter(i => filter === 'pending' ? pendingAny(i.id) : filter === 'issues' ? issue(i.id) : true);
+    const rows = [...items.values()].filter(i => {
+      if (libFilter && !(i.libraryIds || []).includes(libFilter)) return false;
+      if (filter === 'pending') return pendingAny(i.id);
+      if (filter === 'issues') return issue(i.id);
+      return true;
+    });
     const pages = Math.max(1, Math.ceil(rows.length / 30)); page = Math.max(0, Math.min(page, pages - 1));
-    $('#lib-details').hidden = !items.size; $('#lib-detail-count').textContent = items.size ? items.size + ' 部' : '';
+    const hasItems = items.size > 0;
+    $('#lib-details').style.display = hasItems ? '' : 'none';
+    $('#lib-table-count').textContent = rows.length + ' 部';
     $('#lib-rows').innerHTML = rows.slice(page * 30, page * 30 + 30).map(i => `<tr><td><strong>${escapeHtml(i.name)}</strong><small>ID ${escapeHtml(i.id)}</small></td>${STEPS.map(s => `<td>${cell(s, i.id)}</td>`).join('')}</tr>`).join('')
       || '<tr><td colspan="4" class="empty">此范围没有影片</td></tr>';
-    $('#lib-table-count').textContent = rows.length + ' 部';
     $('#lib-page').textContent = `${page + 1} / ${pages}`; $('#lib-prev').disabled = page === 0; $('#lib-next').disabled = page >= pages - 1;
   }
+  function showError(message) { if (message) toast(message, true); }
   function schedule() { clearTimeout(timer); if (visible() && anyActive() && !busy) timer = setTimeout(() => refresh().catch(() => {}), 2000); }
-  function showError(message) { $('#lib-error').textContent = message; $('#lib-error').hidden = !message; }
   async function refresh(withStatus = false) {
     if (request) return request;
     const version = revision;
@@ -117,8 +168,8 @@
   async function act(path, body, done) {
     if (busy) return;
     busy = true; revision++; clearTimeout(timer); render();
-    try { const result = await api('library-tasks/' + path, body); done?.(result); showError(''); }
-    catch (error) { showError(error.message); toast(error.message, true); }
+    try { const result = await api('library-tasks/' + path, body); done?.(result); }
+    catch (error) { showError(error.message); }
     finally { busy = false; await refresh().catch(() => {}); }
   }
   $('#lib-scan').onclick = () => act('scan', {}, result => {
@@ -128,28 +179,39 @@
   $('#lib-fill').onclick = () => {
     const steps = STEPS.filter(s => chosen[s.key] && runnable(s));
     if (busy || anyActive() || !selected.size || !steps.length) return;
+    clearTimeout(hideProgressTimer); hideProgressTimer = null;
+    const progressRow = $('#lib-progress-row'); if (progressRow) { progressRow.hidden = true; delete progressRow.dataset.done; }
     return act('fill', { libraryIds: [...selected], steps: steps.map(s => ({ task: s.key, planId: snaps[s.key].id, includeVerified: !!again[s.key] })) }, () => toast('补全任务已启动，可在此查看进度。'));
   };
   $('#lib-cancel').onclick = () => act('cancel', {}, () => toast('正在停止任务。'));
   $('#lib-refresh').onclick = () => Promise.all([refresh(true), refreshProbeStatus(true), refreshIsoStatus()]).catch(error => toast(error.message, true));
-  $('#lib-progress-refresh').onclick = () => refresh().catch(error => toast(error.message, true));
-  $('#lib-select-all').onchange = event => { selected = new Set(event.currentTarget.checked ? libraries().map(l => l.id) : []); page = 0; render(); };
-  $('#lib-groups').onchange = event => { const id = event.target.dataset.library; if (!id) return; event.target.checked ? selected.add(id) : selected.delete(id); page = 0; render(); };
-  $('#lib-steps').onchange = event => {
+  $('#lib-action-libs').addEventListener('change', event => {
+    const id = event.target.dataset.library; if (!id) return;
+    event.target.checked ? selected.add(id) : selected.delete(id); page = 0; render();
+  });
+  $('#lib-action-libs').addEventListener('click', event => {
+    if (event.target.id === 'lib-select-all-link') {
+      const groups = libraries(), allSel = groups.every(l => selected.has(l.id));
+      selected = allSel ? new Set() : new Set(groups.map(l => l.id)); page = 0; render();
+    }
+  });
+  $('#lib-fill-rows').addEventListener('change', event => {
     const { step, again: key } = event.target.dataset;
     if (step) chosen[step] = event.target.checked; else if (key) again[key] = event.target.checked; else return;
     render();
-  };
-  $('#lib-steps').onclick = event => { const target = event.target.closest('[data-goto-step]')?.dataset.gotoStep; if (target) navigate(target); };
-  $('#lib-filter').onchange = () => { page = 0; renderRows(); };
+  });
+  $('#lib-fill-rows').addEventListener('click', event => {
+    const target = event.target.closest('[data-goto-step]')?.dataset.gotoStep; if (target) navigate(target);
+  });
+  $('#lib-filter').addEventListener('change', () => { page = 0; renderRows(); });
+  document.getElementById('lib-lib-filter')?.addEventListener('change', () => { page = 0; renderRows(); });
   $('#lib-prev').onclick = () => { page--; renderRows(); }; $('#lib-next').onclick = () => { page++; renderRows(); };
-  // Each feature page shows its last check and links here for the batch work.
   const summaries = { language:['summary-language','library-language'], 'media-features':['summary-features','media-features/batch'], chapters:['summary-chapters','chapters/batch'] };
-  const summaryText = (page, t) => !t?.id ? '尚未检查媒体库。' : page === 'language' ? `上次检查：${t.summary.blurayMovies} 部原盘 · ${t.summary.completeMovies} 部信息完整 · ${t.summary.missingMovies + t.summary.unknownMovies} 部待补全。`
-    : page === 'media-features' ? `上次检查：${t.summary.discs} 部原盘 · ${t.summary.verified} 部已核验 · ${t.summary.pending} 部待核验。` : `上次检查：${t.summary.discs} 部原盘 · ${t.summary.verified} 部已补全 · ${t.summary.pending} 部待补全 · ${t.summary.preserved} 部已有章节。`;
-  async function loadSummary(page) {
-    const [id, path] = summaries[page];
-    try { const t = await api(path); $('#' + id).textContent = summaryText(page, t) + (t.active ? ' 任务正在运行。' : ''); } catch (error) { $('#' + id).textContent = error.message; }
+  const summaryText = (pg, t) => !t?.id ? '尚未检查媒体库。' : pg === 'language' ? `上次检查：${t.summary.blurayMovies} 部原盘 · ${t.summary.completeMovies} 部信息完整 · ${t.summary.missingMovies + t.summary.unknownMovies} 部待补全。`
+    : pg === 'media-features' ? `上次检查：${t.summary.discs} 部原盘 · ${t.summary.verified} 部已核验 · ${t.summary.pending} 部待核验。` : `上次检查：${t.summary.discs} 部原盘 · ${t.summary.verified} 部已补全 · ${t.summary.pending} 部待补全 · ${t.summary.preserved} 部已有章节。`;
+  async function loadSummary(pg) {
+    const [id, path] = summaries[pg];
+    try { const t = await api(path); $('#' + id).textContent = summaryText(pg, t) + (t.active ? ' 任务正在运行。' : ''); } catch (error) { $('#' + id).textContent = error.message; }
   }
   window.addEventListener('helper:navigate', () => {
     clearTimeout(timer);
@@ -159,6 +221,6 @@
   });
   document.addEventListener('visibilitychange', () => { clearTimeout(timer); if (visible()) refresh().catch(() => {}); });
   window.addEventListener('helper:status', () => { if (location.hash === '#library') render(); });
-  window.addEventListener('helper:logout', () => { clearTimeout(timer); revision++; request = null; pipeline = null; snaps = {}; featureStatus = chapterStatus = null; planKey = ''; selected = new Set(); chosen = {}; again = {}; });
+  window.addEventListener('helper:logout', () => { clearTimeout(timer); clearTimeout(hideProgressTimer); hideProgressTimer = null; revision++; request = null; pipeline = null; snaps = {}; featureStatus = chapterStatus = null; planKey = ''; selected = new Set(); chosen = {}; again = {}; });
   render();
 })();

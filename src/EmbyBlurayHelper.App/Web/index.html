@@ -103,29 +103,35 @@
     <div class="panel settings-panel spaced"><div class="panel-heading"><span class="feature-icon lavender"><svg><use href="#shield"/></svg></span><div><h2>管理账号</h2><p>设置此控制台的登录用户名和密码。</p></div></div><form id="account-form"><div class="input-grid"><div><label for="account-username">用户名</label><input id="account-username" name="username" autocomplete="username" maxlength="128" required></div><div><label for="account-password">新密码</label><input id="account-password" name="password" type="password" autocomplete="new-password" placeholder="输入要使用的密码" maxlength="1024" required></div></div><p class="field-help">账号明文保存在 data/account.json。保存后使用新账号重新登录。</p><div class="form-actions"><button id="save-account" class="button secondary" type="submit">保存账号</button></div></form></div>
     </section>
 
-  <section class="page" id="page-library" hidden><div class="page-heading"><div><span class="eyebrow">LIBRARY TASKS</span><h1>媒体库处理<span class="heading-dot">.</span></h1><p>一次检查，按顺序补全语言、规格与章节。</p></div><button id="lib-refresh" class="button secondary"><svg><use href="#refresh"/></svg>刷新状态</button></div>
-   <div class="panel settings-panel">
-    <div class="panel-heading"><span class="feature-icon lavender"><svg><use href="#layers"/></svg></span><div><h2>选择媒体库</h2><p>检查只读取 Emby 已保存的信息，不读取原盘文件。跨库影片只处理一次。</p></div></div>
-    <div class="library-counts"><div><span>原盘影片</span><strong id="lib-count-discs">—</strong><small id="lib-count-discs-foot">尚未检查媒体库</small></div><div><span>语言与时长待补全</span><strong id="lib-count-language">—</strong><small>语言缺失或信息不足</small></div><div><span>规格待核验</span><strong id="lib-count-features">—</strong><small>尚无有效核验记录</small></div><div><span>章节待补全</span><strong id="lib-count-chapters">—</strong><small>缺失或等间隔生成</small></div></div>
-    <div class="library-scope" id="lib-scope" hidden>
-     <div class="library-scope-heading"><div><h3>媒体库</h3><p>可全选，也可仅处理部分媒体库。</p></div><label class="library-select-all"><input type="checkbox" id="lib-select-all">全选媒体库</label></div>
-     <div class="log-table-wrap"><table class="log-table library-scope-table"><thead><tr><th>媒体库</th><th>电影</th><th>原盘</th><th>语言与时长待补全</th><th>规格待核验</th><th>章节待补全</th></tr></thead><tbody id="lib-groups"></tbody></table></div>
-     <p class="field-help" id="lib-selection"></p>
-    </div>
-    <div class="form-actions library-actions"><button id="lib-scan" class="button secondary"><svg><use href="#search"/></svg>检查媒体库</button></div>
+  <section class="page" id="page-library" hidden>
+  <div class="page-heading"><div><span class="eyebrow">LIBRARY TASKS</span><h1>媒体库处理<span class="heading-dot">.</span></h1><p>一次检查，按顺序补全语言、规格与章节。</p></div><button id="lib-refresh" class="button secondary"><svg><use href="#refresh"/></svg>刷新状态</button></div>
+  <div class="lib-action-card">
+   <div class="lib-action-left">
+    <p class="lib-action-summary" id="lib-action-summary">尚未检查媒体库</p>
+    <div class="lib-action-libs" id="lib-action-libs" hidden></div>
+    <div class="form-actions" style="margin-top:0"><button id="lib-scan" class="button secondary"><svg><use href="#search"/></svg>检查媒体库</button></div>
+    <p class="lib-action-scan-note">检查只读取 Emby 已保存的信息，不读取原盘。</p>
    </div>
-   <div class="panel settings-panel spaced">
-    <div class="panel-heading"><span class="feature-icon mint"><svg><use href="#check"/></svg></span><div><h2>补全内容</h2><p>按语言与时长 → 音视频规格 → 原盘章节的顺序逐项执行，同一时间只有一项在读取原盘。关闭浏览器不影响任务。</p></div></div>
-    <div class="lib-steps" id="lib-steps"></div>
-    <div class="form-actions library-actions"><button id="lib-fill" class="button primary" disabled>补全所选内容</button><button id="lib-cancel" class="button danger" hidden>停止</button><button id="lib-progress-refresh" class="text-button accent"><svg><use href="#refresh"/></svg>刷新进度</button></div>
-    <div class="status-box" id="lib-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong>尚未开始</strong><p>先检查媒体库，再勾选需要补全的内容。</p></div></div>
-    <p class="error" id="lib-error" role="alert" hidden></p>
-    <details class="library-details" id="lib-details" hidden><summary>影片明细 <span id="lib-detail-count"></span></summary>
-     <div class="library-table-toolbar"><label for="lib-filter">显示所选库</label><select id="lib-filter"><option value="all">全部原盘</option><option value="pending">有待处理</option><option value="issues">失败 / 仍有缺失</option></select><span id="lib-table-count"></span></div>
-     <div class="log-table-wrap"><table class="log-table library-table"><thead><tr><th>影片</th><th>语言与时长</th><th>音视频规格</th><th>原盘章节</th></tr></thead><tbody id="lib-rows"></tbody></table></div>
-     <div class="library-pagination"><button class="button secondary" id="lib-prev">上一页</button><span id="lib-page"></span><button class="button secondary" id="lib-next">下一页</button></div>
-    </details>
+   <div class="lib-action-right">
+    <div class="lib-fill-rows" id="lib-fill-rows"></div>
+    <div class="lib-action-btns"><button id="lib-cancel" class="button danger" hidden>停止</button><button id="lib-fill" class="button primary" disabled>开始补全</button></div>
    </div>
+  </div>
+  <div class="lib-progress-row" id="lib-progress-row" hidden>
+   <div class="lib-progress-head"><strong id="lib-progress-title"></strong><span id="lib-progress-count"></span></div>
+   <progress id="lib-progress-bar" value="0" max="1"></progress>
+   <p class="lib-progress-current" id="lib-progress-current"></p>
+  </div>
+  <div class="lib-table-section" id="lib-details">
+   <div class="lib-table-toolbar">
+    <select id="lib-filter"><option value="all">全部原盘</option><option value="pending">有待处理</option><option value="issues">失败 / 仍有缺失</option></select>
+    <select id="lib-lib-filter"><option value="">全部媒体库</option></select>
+    <span class="lib-table-count" id="lib-table-count"></span>
+   </div>
+   <div class="log-table-wrap"><table class="log-table library-table"><thead><tr><th>影片</th><th>语言与时长</th><th>音视频规格</th><th>原盘章节</th></tr></thead><tbody id="lib-rows"></tbody></table></div>
+   <div class="library-pagination"><button class="button secondary" id="lib-prev">上一页</button><span id="lib-page"></span><button class="button secondary" id="lib-next">下一页</button></div>
+  </div>
+  <p class="error" id="lib-error" role="alert" hidden></p>
   </section>
 
   <section class="page" id="page-language" hidden><div class="page-heading"><div><span class="eyebrow">LANGUAGE &amp; RUNTIME</span><h1>语言与时长<span class="heading-dot">.</span></h1><p>接入 Emby 探测器，并按媒体库批量补齐原盘语言与时长。</p></div><button id="refresh-language" class="button secondary"><svg><use href="#refresh"/></svg>刷新状态</button></div>
