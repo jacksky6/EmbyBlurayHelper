@@ -195,6 +195,55 @@ try
             "unmarked source languages remain unresolved and are explained without guessing");
         backend.Mode="normal"; backend.DirectBdmv=false;
 
+        // Rechecking complete discs must reach the probe, including every disc version.
+        var priorItems = backend.Items;
+        var completeIso = MockEmby.Movie("70","eng","iso",iso:true);
+        var completeIsoAlt = completeIso["MediaSources"]![0]!.DeepClone();
+        completeIsoAlt["Id"]="source-70-alt"; completeIsoAlt["Path"]="/discs/70-alt.iso";
+        completeIso["MediaSources"]!.AsArray().Add(completeIsoAlt);
+        var completeBdmv = MockEmby.Movie("72","eng",mixed:true);
+        completeBdmv["MediaSources"]![1]!["MediaStreams"]![0]!["Width"]=1920;
+        var completeBdmvAlt = completeBdmv["MediaSources"]![1]!.DeepClone();
+        completeBdmvAlt["Id"]="source-72-alt"; completeBdmvAlt["Path"]="/discs/72-alt";
+        completeBdmv["MediaSources"]!.AsArray().Add(completeBdmvAlt);
+        var unknownResolution = MockEmby.Movie("71","eng");
+        unknownResolution["MediaSources"]![0]!["MediaStreams"]![0]!["Width"]=0;
+        backend.Items=[completeIso,completeBdmv,unknownResolution];
+        backend.Memberships=new(){["a"]=["70","72"],["b"]=["70","71"]};
+        task.Scan(); ready=await Idle(task);
+        summary=ready.GetProperty("summary");
+        Check(N(ready,"moviesChecked")==3 && N(summary,"blurayMovies")==3 && N(summary,"uhdMovies")==1 &&
+            N(summary,"fullHdMovies")==1 && N(summary,"unclassifiedMovies")==1,
+            "resolution summary deduplicates movies and separates UHD, 1080P and unknown discs");
+        Throws(()=>task.Fill(S(ready,"id"),["a"]), "complete discs remain excluded by default");
+        Throws(()=>task.Fill(S(ready,"id"),[],true), "include-verified cannot turn an empty scope into all libraries");
+        Throws(()=>task.Fill(S(ready,"id"),["not-in-plan"],true), "include-verified still rejects unknown libraries");
+        writeCount=backend.Writes.Count;
+        task.Fill(S(ready,"id"),["a"],true); finished=await Idle(task);
+        Check(N(finished,"planned")==2 && N(finished,"completed")==2 && N(finished,"skipped")==0 &&
+            backend.Writes.Skip(writeCount).Order().SequenceEqual(new[]{"70","70","72"}),
+            "include-verified reprobes complete ISO versions and refreshes complete legacy BDMV within the selected library");
+        Check(finished.GetProperty("includeVerified").GetBoolean() &&
+            JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(directory,"library-language-task.json")))!["includeVerified"]!.GetValue<bool>() &&
+            log.Entries().Any(e=>e.Source=="LibraryLanguage" && e.Message.Contains("含已核验的")),
+            "the recheck mode is returned, persisted and logged");
+        backend.DirectBdmv=true;
+        var probeStart=backend.ProbeRequests.Count;
+        task.Fill(S(finished,"id"),["a"],true); finished=await Idle(task);
+        Check(N(finished,"completed")==2 && backend.ProbeRequests.Skip(probeStart).Select(r=>r.SourceId).Order()
+            .SequenceEqual(new[]{"source-70","source-70-alt","source-72","source-72-alt"}),
+            "direct recheck probes every complete BDMV and ISO source while excluding MKV versions and unselected movies");
+        backend.ProbeFailure=true;
+        task.Fill(S(finished,"id"),["a"],true); finished=await Idle(task);
+        Check(N(finished,"failed")==2 && N(finished,"completed")==0, "saved complete languages cannot hide a failed recheck");
+        backend.ProbeFailure=false;
+        probeStart=backend.ProbeRequests.Count;
+        task.Fill(S(finished,"id"),["a","b"],true); finished=await Idle(task);
+        Check(N(finished,"planned")==3 && N(finished,"completed")==3 && backend.ProbeRequests.Skip(probeStart).Count(r=>r.ItemId=="70")==2,
+            "include-verified across libraries processes a shared multi-version movie only once");
+        Throws(()=>task.Fill(S(finished,"id")), "a later default fill does not silently inherit include-verified mode");
+        backend.Items=priorItems; backend.Memberships=new(){["a"]=null}; backend.DirectBdmv=false;
+
         backend.FailPagination = true; task.Scan(); var broken = await Idle(task);
         Check(S(broken,"status") == "failed" && !broken.GetProperty("scanComplete").GetBoolean(), "incomplete list is not offered as a valid plan");
         backend.FailPagination = false; task.Scan(); await Idle(task);
@@ -240,6 +289,15 @@ try
         Check(analyzed is not null && analyzed.Classification == "missing" && analyzed.Sources.Count == 1,
             $"Emby {container} sources join the shared original-disc completion workflow");
     }
+
+    var lowResolution=MockEmby.Movie("resolution","eng");
+    lowResolution["MediaSources"]![0]!["MediaStreams"]![0]!["Width"]=1280;
+    Check(LibraryLanguageTask.Analyze(JsonSerializer.SerializeToElement(lowResolution))!.Format=="待确认",
+        "a non-UHD resolution is not automatically counted as 1080P");
+    lowResolution["MediaSources"]![0]!["MediaStreams"]![0]!["Width"]=1440;
+    lowResolution["MediaSources"]![0]!["MediaStreams"]![0]!["Height"]=1080;
+    Check(LibraryLanguageTask.Analyze(JsonSerializer.SerializeToElement(lowResolution))!.Format=="Blu-ray",
+        "1080-line Blu-ray with a non-square-pixel width is still classified as full HD");
 
     // Simulate a crash using a real persisted active state, without an automatic resume on startup.
     var path = Path.Combine(directory,"library-language-task.json");

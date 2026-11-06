@@ -14,7 +14,7 @@ const libs = [{ id:'a', name:'Lib <A>', moviesChecked:3, scanComplete:true }, { 
 const plan = (id, extra) => ({ id, status:'ready', active:false, scanComplete:true, connectionMatches:true, ...extra });
 const state = {
   'library-tasks': { status:'idle', active:false, steps:[], libraryIds:[] },
-  'library-language': plan('L', { moviesChecked:5, summary:{ blurayMovies:3, uhdMovies:2, completeMovies:1, missingMovies:2, unknownMovies:0 },
+  'library-language': plan('L', { moviesChecked:5, summary:{ blurayMovies:3, uhdMovies:2, fullHdMovies:1, unclassifiedMovies:0, completeMovies:1, missingMovies:2, unknownMovies:0 },
     libraries: libs.map(l => ({ ...l, blurayMovies:2, pendingMovies: l.id === 'a' ? 2 : 1 })),
     items:[{ id:'s', name:'Shared <m>', libraryIds:['a','b'], classification:'missing', missingAudio:1, missingSubtitles:0, sources:[{}] },
       { id:'x', name:'A only', libraryIds:['a'], classification:'missing', missingAudio:0, missingSubtitles:2, sources:[{ isIso:true }] },
@@ -52,9 +52,17 @@ const step = key => d.querySelector(`.lib-fill-row input[data-step="${key}"]`).c
 const fill = () => d.querySelector('#lib-fill');
 (async () => {
   w.dispatchEvent(new w.Event('helper:navigate')); await settle();
+  check(d.querySelector('#lib-action-summary').textContent === '5 部电影 · 3 部蓝光原盘\n其中 UHD 蓝光 2 部 · 1080P 蓝光 1 部', 'summary starts with the movie total and breaks down Blu-ray resolution counts');
   check(d.querySelectorAll('#lib-action-libs label').length === 2 && d.querySelector('#lib-action-libs').textContent.includes('Lib <A>') && !d.querySelector('#lib-action-libs a'), 'libraries from all three checks are merged and escaped');
   check([...d.querySelectorAll('#lib-action-libs input[data-library]')].every(i => i.checked), 'all libraries are selected after a new check');
   check(step('language').textContent.includes('2 部待处理') && d.querySelector('[data-step="language"]').checked, 'language counts each movie once across libraries and is chosen');
+  check([...d.querySelectorAll('#lib-fill-rows [data-again]')].map(i => i.dataset.again).join(',') === 'language,features,chapters', 'all three completions offer the same include-verified option');
+  const languageAgain = d.querySelector('[data-again="language"]');
+  check(!languageAgain.checked && !languageAgain.disabled, 'language recheck is opt-in after a valid check');
+  languageAgain.checked = true; languageAgain.dispatchEvent(new w.Event('change', { bubbles:true }));
+  check(step('language').textContent.includes('3 部待处理'), 'language recheck includes complete movies and deduplicates shared movies');
+  d.querySelector('[data-again="language"]').checked = false; d.querySelector('[data-again="language"]').dispatchEvent(new w.Event('change', { bubbles:true }));
+  check(step('language').textContent.includes('2 部待处理'), 'turning language recheck off restores the missing-only scope');
   check(step('features').textContent.includes('条件未满足') && d.querySelector('[data-step="features"]').disabled && !d.querySelector('[data-step="features"]').checked, 'a step whose feature is off cannot be chosen');
   check(step('features').textContent.includes('音视频规格'), 'the reason names the settings page');
   check(fill().textContent === '开始补全' && !fill().disabled, 'fill shows enabled with eligible steps');
@@ -66,11 +74,13 @@ const fill = () => d.querySelector('#lib-fill');
   evaluate("isoStatus={state:'ready',canProbe:true};window.dispatchEvent(new Event('helper:status'));");
   const again = d.querySelector('[data-again="chapters"]'); again.checked = true; again.dispatchEvent(new w.Event('change', { bubbles:true }));
   check(!fill().disabled && d.querySelector('[data-again="chapters"]').checked, 'recheck makes completed chapters eligible and fill stays enabled');
+  d.querySelector('[data-again="language"]').checked = true; d.querySelector('[data-again="language"]').dispatchEvent(new w.Event('change', { bubbles:true }));
   check(d.querySelector('#lib-rows').textContent.includes('Shared <m>') && d.querySelectorAll('#lib-rows tr').length === 3, 'details merge movies across tasks');
   await fill().onclick(); await settle();
   const sent = posts.find(p => p.route === 'library-tasks/fill').body;
-  check(sent.libraryIds.join(',') === 'a,b' && sent.steps.map(s => `${s.task}:${s.planId}:${s.includeVerified}`).join(',') === 'language:L:false,chapters:C:true', 'fill sends the scope and the ordered steps with their plans');
+  check(sent.libraryIds.join(',') === 'a,b' && sent.steps.map(s => `${s.task}:${s.planId}:${s.includeVerified}`).join(',') === 'language:L:true,chapters:C:true', 'fill sends the scope, ordered plans and language recheck option');
   check(fill().disabled && [...d.querySelectorAll('#lib-action-libs input')].every(i => i.disabled) && !d.querySelector('#lib-cancel').hidden, 'the running chain locks the page');
+  check([...d.querySelectorAll('#lib-fill-rows [data-again]')].every(i => i.disabled), 'a running chain also locks every recheck option');
   check(d.querySelector('#lib-progress-title').textContent === '语言与时长' && d.querySelector('#lib-progress-count').textContent === '1 / 2', 'progress shows the current step');
   check([...timers.values()].some(t => t.ms === 2000), 'visible running chain polls progress');
   w.history.replaceState(null, '', '#logs'); w.dispatchEvent(new w.Event('helper:navigate'));
@@ -88,5 +98,13 @@ const fill = () => d.querySelector('#lib-fill');
   check(posts.some(p => p.route === 'library-tasks/scan') && d.querySelector('#toast').textContent.includes('部分检查未启动'), 'one check for all three; failures are reported');
   w.history.replaceState(null, '', '#chapters'); w.dispatchEvent(new w.Event('helper:navigate')); await settle();
   check(d.querySelector('#summary-chapters').textContent.includes('上次检查：3 部原盘'), 'feature pages show their last check and link here');
+  state['library-language'].items.forEach(i => { i.classification = 'complete'; });
+  Object.assign(state['library-language'].summary, { uhdMovies:1, fullHdMovies:1, unclassifiedMovies:1 });
+  w.history.replaceState(null, '', '#library'); w.dispatchEvent(new w.Event('helper:navigate')); await settle();
+  check(d.querySelector('#lib-action-summary').textContent === '5 部电影 · 3 部蓝光原盘\n其中 UHD 蓝光 1 部 · 1080P 蓝光 1 部 · 规格未识别 1 部', 'unknown specifications are shown separately instead of counted as 1080P');
+  d.querySelector('[data-again="language"]').checked = false; d.querySelector('[data-again="language"]').dispatchEvent(new w.Event('change', { bubbles:true }));
+  check(step('language').textContent.includes('无需处理') && d.querySelector('[data-step="language"]').disabled, 'complete-only libraries still skip language work by default');
+  d.querySelector('[data-again="language"]').checked = true; d.querySelector('[data-again="language"]').dispatchEvent(new w.Event('change', { bubbles:true }));
+  check(step('language').textContent.includes('3 部待处理') && !d.querySelector('[data-step="language"]').disabled && !fill().disabled, 'language recheck makes an already complete library runnable');
   console.log(`Passed ${checks} media library task Web checks.`);
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => w.close());

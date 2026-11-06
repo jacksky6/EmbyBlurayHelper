@@ -33,7 +33,7 @@ internal sealed class LibraryPipeline : IAsyncDisposable
         this.log = log;
         tasks = new Runner[]
         {
-            new("language", "语言与时长", () => language.State, (s, ids) => language.Fill(s.PlanId, ids), language.Cancel, language.Scan),
+            new("language", "语言与时长", () => language.State, (s, ids) => language.Fill(s.PlanId, ids, s.IncludeVerified), language.Cancel, language.Scan),
             new("features", "音视频规格", () => features.State, (s, ids) => features.Fill(s.PlanId, ids, s.IncludeVerified), features.Cancel, features.Scan),
             new("chapters", "原盘章节", () => chapters.State, (s, ids) => chapters.Fill(s.PlanId, ids, s.IncludeVerified), chapters.Cancel, chapters.Scan)
         }.ToDictionary(t => t.Key);

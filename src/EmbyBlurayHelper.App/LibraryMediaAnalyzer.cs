@@ -16,6 +16,7 @@ internal static class LibraryMediaAnalyzer
         var movie = new LibraryMovie { Id = Text(item, "Id"), Name = Text(item, "Name") };
         var noAudio = false;
         var width = 0;
+        var height = 0;
         foreach (var source in discSources)
         {
             var path = Text(source, "Path");
@@ -28,7 +29,11 @@ internal static class LibraryMediaAnalyzer
                 foreach (var stream in streams.EnumerateArray())
                 {
                     var type = Text(stream, "Type");
-                    if (type == "Video") width = Math.Max(width, Number(stream, "Width"));
+                    if (type == "Video")
+                    {
+                        width = Math.Max(width, Number(stream, "Width"));
+                        height = Math.Max(height, Number(stream, "Height"));
+                    }
                     if (type is not ("Audio" or "Subtitle") || Flag(stream, "IsExternal")) continue;
                     entry.Tracks.Add(new LibraryTrack { Index = Number(stream, "Index"), Type = type, Language = Text(stream, "Language") });
                 }
@@ -36,7 +41,7 @@ internal static class LibraryMediaAnalyzer
             noAudio |= !entry.Tracks.Any(t => t.Type == "Audio") || path.Length == 0;
             movie.Sources.Add(entry);
         }
-        movie.Format = width >= 3840 ? "UHD" : width > 0 ? "Blu-ray" : "待确认";
+        movie.Format = width >= 3840 || height >= 2160 ? "UHD" : width == 1920 || height == 1080 ? "Blu-ray" : "待确认";
         movie.MissingAudio = movie.Sources.Sum(s => s.Tracks.Count(t => t.Type == "Audio" && Unknown(t.Language)));
         movie.MissingSubtitles = movie.Sources.Sum(s => s.Tracks.Count(t => t.Type == "Subtitle" && Unknown(t.Language)));
         movie.MissingRuntime = movie.Sources.Count(source => source.RunTimeTicks is null or <= 0);

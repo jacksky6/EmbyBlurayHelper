@@ -7,7 +7,7 @@
   let planKey = '', selected = new Set(), chosen = {}, again = {};
   let hideProgressTimer = null;
   const STEPS = [
-    { key:'language', name:'语言与时长', page:'language', api:'library-language', pending:i => ['missing','unknown'].includes(i.classification),
+    { key:'language', name:'语言与时长', page:'language', api:'library-language', recheck:'含已核验的', pending:i => ['missing','unknown'].includes(i.classification),
       done:i => i.classification === 'complete', missing:i => i.classification === 'missing' ? `缺音轨 ${i.missingAudio} · 字幕 ${i.missingSubtitles}` : i.classification === 'unknown' ? '信息不足' : '暂不支持',
       known:() => !!probeStatus && probeStatus.state !== 'checking', blocked:() => !(probeStatus?.state === 'connected' && probeStatus.languagePatchEnabled) ? '需要在「语言与时长」开启「Emby 探测语言补全」并确认已接入。' : '',
       note:items => { const iso = items.filter(i => i.sources?.some(s => s.isIso)).length; return iso && isoStatus && !isoStatus.canProbe ? `${iso} 部 ISO 因插件或 ffprobe 条件未满足将跳过，其余 BDMV 照常补全。` : ''; } },
@@ -55,8 +55,10 @@
     const discs = lang ? lang.blurayMovies : (snaps.features?.summary?.discs ?? null);
     const movies = snaps.language?.moviesChecked ?? null;
     const uhd = lang?.uhdMovies ?? null;
+    const fullHd = lang?.fullHdMovies ?? null;
+    const unclassified = lang?.unclassifiedMovies ?? null;
     $('#lib-action-summary').textContent = discs !== null
-      ? `${discs} 部原盘 · ${movies ?? '?'} 部电影 · ${uhd ?? '?'} 部 UHD`
+      ? `${movies ?? '?'} 部电影 · ${discs} 部蓝光原盘` + (lang ? `\n其中 UHD 蓝光 ${uhd ?? '?'} 部 · 1080P 蓝光 ${fullHd ?? '?'} 部${unclassified > 0 ? ` · 规格未识别 ${unclassified} 部` : ''}` : '')
       : '尚未检查媒体库';
     const libsEl = $('#lib-action-libs');
     libsEl.hidden = false;

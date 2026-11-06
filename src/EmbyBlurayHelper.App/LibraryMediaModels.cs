@@ -24,6 +24,7 @@ internal sealed class LibraryPlan
     public string Message { get; set; } = "尚未检查电影库。";
     public string? PersistenceWarning { get; set; }
     public string Scope { get; set; } = "";
+    public bool IncludeVerified { get; set; }
     public List<string> SelectedLibraryIds { get; set; } = [];
     public List<string> PlannedItemIds { get; set; } = [];
     public List<LibraryGroup> Libraries { get; set; } = [];

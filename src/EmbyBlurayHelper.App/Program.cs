@@ -256,7 +256,7 @@ app.MapPost("/api/probe/restore", (CancellationToken token) => integration.Apply
 app.MapGet("/api/library-language", () => libraryTask.Snapshot());
 app.MapGet("/api/iso/status", (CancellationToken token) => libraryTask.CheckIsoPrerequisites(token));
 app.MapPost("/api/library-language/scan", () => Results.Json(libraryTask.Scan(), statusCode: 202));
-app.MapPost("/api/library-language/fill", (LibraryPlanInput input) => Results.Json(libraryTask.Fill(input.PlanId, input.LibraryIds), statusCode: 202));
+app.MapPost("/api/library-language/fill", (LibraryPlanInput input) => Results.Json(libraryTask.Fill(input.PlanId, input.LibraryIds, input.IncludeVerified), statusCode: 202));
 app.MapPost("/api/library-language/cancel", () => libraryTask.Cancel());
 app.MapPost("/api/disc/check", (DiscInput input, HttpContext context) => integration.Inspect(input.ItemId, context.RequestAborted));
 app.MapGet("/api/media-features", (CancellationToken token) => mediaFeatures.Status(token));
@@ -286,7 +286,7 @@ internal sealed record LoginInput(string Username, string Password);
 internal sealed record DiscInput(string ItemId);
 internal sealed record ProbeToggleInput(bool Enabled);
 internal sealed record ProbeDiscoveryInput(string EmbyUrl, string EmbyApiKey);
-internal sealed record LibraryPlanInput(string PlanId, string[]? LibraryIds = null);
+internal sealed record LibraryPlanInput(string PlanId, string[]? LibraryIds = null, bool IncludeVerified = false);
 internal sealed record MediaFeatureInput(bool Enabled, string ProbePath, bool? OriginalTrackTitles = null);
 internal sealed record FeatureProbeInput(string ProbePath);
 internal sealed record LibraryTasksInput(string[]? LibraryIds, LibraryPipeline.StepInput[]? Steps);

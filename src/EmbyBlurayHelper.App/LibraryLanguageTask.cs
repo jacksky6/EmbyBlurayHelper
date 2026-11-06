@@ -72,7 +72,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
                 plan.Id, plan.Status, plan.Operation, plan.StartedAt, plan.FinishedAt, plan.CheckedAt,
                 plan.ScanComplete, plan.MoviesChecked, plan.MoviesTotal, plan.Planned, plan.Processed,
                 plan.Completed, plan.Partial, plan.Failed, plan.Skipped, plan.CurrentItemId, plan.CurrentName,
-                plan.Message, plan.PersistenceWarning, plan.SelectedLibraryIds, plan.Scope,
+                plan.Message, plan.PersistenceWarning, plan.SelectedLibraryIds, plan.Scope, plan.IncludeVerified,
                 librariesChecked = plan.Libraries.Count(l => l.ScanComplete),
                 active = Active(plan.Status), connectionMatches = same,
                 canFill = !Active(plan.Status) && plan.ScanComplete && plan.Libraries.Count > 0 && same && pending > 0,
@@ -80,6 +80,8 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
                 {
                     blurayMovies = plan.Items.Count,
                     uhdMovies = plan.Items.Count(i => i.Format == "UHD"),
+                    fullHdMovies = plan.Items.Count(i => i.Format == "Blu-ray"),
+                    unclassifiedMovies = plan.Items.Count(i => i.Format is not ("UHD" or "Blu-ray")),
                     completeMovies = plan.Items.Count(i => i.Classification == "complete"),
                     missingMovies = plan.Items.Count(i => i.Classification == "missing"),
                     unknownMovies = plan.Items.Count(i => i.Classification == "unknown"),
@@ -134,7 +136,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         }
     }
 
-    public object Fill(string planId, string[]? libraryIds = null)
+    public object Fill(string planId, string[]? libraryIds = null, bool includeVerified = false)
     {
         lock (gate)
         {
@@ -146,9 +148,11 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
             var selected = (libraryIds ?? plan.Libraries.Select(l => l.Id).ToArray()).Distinct(StringComparer.Ordinal).ToArray();
             if (selected.Length == 0) throw new InvalidOperationException("请至少选择一个媒体库。");
             if (selected.Any(id => !plan.Libraries.Any(l => l.Id == id))) throw new InvalidOperationException("所选媒体库不在检查计划中，请重新检查媒体库。");
-            var pending = plan.Items.Where(i => i.LibraryIds.Intersect(selected).Any() && i.Classification is "missing" or "unknown").ToArray();
+            var pending = plan.Items.Where(i => i.LibraryIds.Intersect(selected).Any() &&
+                (i.Classification is "missing" or "unknown" || (includeVerified && i.Classification == "complete"))).ToArray();
             if (pending.Length == 0) throw new InvalidOperationException("所选媒体库没有需要补全的原盘。");
             plan.SelectedLibraryIds = selected.ToList();
+            plan.IncludeVerified = includeVerified;
             plan.Scope = selected.Length == plan.Libraries.Count ? "全部媒体库" : string.Join("、", plan.Libraries.Where(l => selected.Contains(l.Id)).Select(l => l.Name));
             plan.PlannedItemIds = pending.Select(i => i.Id).ToList();
             plan.Status = "filling"; plan.Operation = "fill";
@@ -348,7 +352,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         var blockedIso = isoStatus is { CanProbe: false } ? pending.Count(movie => movie.Sources.Any(source => source.IsIso)) : 0;
         if (blockedIso > 0)
             log.Add("Warning", "LibraryLanguage", $"ISO 前置检查未通过，{blockedIso} 部 ISO 不提交探测；仅处理其余 BDMV。{isoStatus!.Message}");
-        log.Add("Information", "LibraryLanguage", $"开始批量补全，范围：{plan.Scope}。计划 {pending.Length} 部蓝光原盘，逐部提交并核验音轨、字幕语言及时长。刷新后的核验窗口最多 15 秒，插件实际探测耗时另计。");
+        log.Add("Information", "LibraryLanguage", $"开始批量补全，范围：{plan.Scope}。计划 {pending.Length} 部蓝光原盘{(plan.IncludeVerified ? "（含已核验的）" : "")}，逐部提交并核验音轨、字幕语言及时长。刷新后的核验窗口最多 15 秒，插件实际探测耗时另计。");
         foreach (var movie in pending)
         {
             token.ThrowIfCancellationRequested();
@@ -372,7 +376,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
                 var before = await ReadMovie(config, movie.Id, token, mediaReadTimeout);
                 if (before is null) { FinishMovie(movie, null, "skipped", "影片已删除或已不是蓝光原盘"); continue; }
                 if (!SameSources(movie, before)) { FinishMovie(movie, null, "failed", "原盘媒体源已变化，请重新检查媒体库后重试"); continue; }
-                if (before.Classification == "complete" && !movie.NeedsPlaylistRepair) { FinishMovie(movie, before, "skipped", "最新语言及时长已完整，无需重新探测"); continue; }
+                if (before.Classification == "complete" && !movie.NeedsPlaylistRepair && !plan.IncludeVerified) { FinishMovie(movie, before, "skipped", "最新语言及时长已完整，无需重新探测"); continue; }
                 if (before.Classification == "unsupported") { FinishMovie(movie, before, "skipped", before.Message); continue; }
                 log.Add("Information", "LibraryLanguage",
                     $"{movie.Name}（ID {movie.Id}）重新探测前：{DescribeTracks(before)}");
@@ -387,7 +391,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
                         FinishMovie(movie, before, "failed", "Emby 未返回完整的蓝光媒体源 ID，未提交探测。");
                         continue;
                     }
-                    foreach (var probeSource in before.Sources.Where(source => (movie.NeedsPlaylistRepair && source.IsIso) || source.RunTimeTicks is null or <= 0 || !source.Tracks.Any(track => track.Type == "Audio") ||
+                    foreach (var probeSource in before.Sources.Where(source => plan.IncludeVerified || (movie.NeedsPlaylistRepair && source.IsIso) || source.RunTimeTicks is null or <= 0 || !source.Tracks.Any(track => track.Type == "Audio") ||
                                  source.Tracks.Any(track => Unknown(track.Language))))
                     {
                         EnsureContext(config, true);
@@ -404,7 +408,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
                     }
                     Update(() => movie.SubmittedAt = DateTimeOffset.UtcNow);
                 }
-                else if (movie.SubmittedAt is null || movie.VerifiedAt >= movie.SubmittedAt || movie.SubmittedAt.Value.Add(verificationTimeout) <= DateTimeOffset.UtcNow)
+                else if (plan.IncludeVerified || movie.SubmittedAt is null || movie.VerifiedAt >= movie.SubmittedAt || movie.SubmittedAt.Value.Add(verificationTimeout) <= DateTimeOffset.UtcNow)
                 {
                     Update(() => movie.Message = "正在请求 Emby 重新探测 BDMV 文件夹原盘。");
                     using var response = await Send(config, HttpMethod.Post,
@@ -477,7 +481,7 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         {
             if (latest is not null)
             {
-                movie.Classification = latest.Classification; movie.Sources = latest.Sources;
+                movie.Classification = latest.Classification; movie.Sources = latest.Sources; movie.Format = latest.Format;
                 movie.MissingAudio = latest.MissingAudio; movie.MissingSubtitles = latest.MissingSubtitles;
                 movie.MissingRuntime = latest.MissingRuntime;
             }
