@@ -140,11 +140,12 @@
       if (filter === 'issues') return issue(i.id);
       return true;
     });
-    const pages = Math.max(1, Math.ceil(rows.length / 30)); page = Math.max(0, Math.min(page, pages - 1));
+    const size = Number($('#lib-page-size').value) || 20;
+    const pages = Math.max(1, Math.ceil(rows.length / size)); page = Math.max(0, Math.min(page, pages - 1));
     const hasItems = items.size > 0;
     $('#lib-details').style.display = hasItems ? '' : 'none';
     $('#lib-table-count').textContent = rows.length + ' 部';
-    $('#lib-rows').innerHTML = rows.slice(page * 30, page * 30 + 30).map(i => `<tr><td><strong>${escapeHtml(i.name)}</strong><small>ID ${escapeHtml(i.id)}</small></td>${STEPS.map(s => `<td>${cell(s, i.id)}</td>`).join('')}</tr>`).join('')
+    $('#lib-rows').innerHTML = rows.slice(page * size, page * size + size).map(i => `<tr><td><strong>${escapeHtml(i.name)}</strong><small>ID ${escapeHtml(i.id)}</small></td>${STEPS.map(s => `<td>${cell(s, i.id)}</td>`).join('')}</tr>`).join('')
       || '<tr><td colspan="4" class="empty">此范围没有影片</td></tr>';
     $('#lib-page').textContent = `${page + 1} / ${pages}`; $('#lib-prev').disabled = page === 0; $('#lib-next').disabled = page >= pages - 1;
   }
@@ -205,6 +206,7 @@
   });
   $('#lib-filter').addEventListener('change', () => { page = 0; renderRows(); });
   document.getElementById('lib-lib-filter')?.addEventListener('change', () => { page = 0; renderRows(); });
+  $('#lib-page-size').addEventListener('change', () => { page = 0; renderRows(); });
   $('#lib-prev').onclick = () => { page--; renderRows(); }; $('#lib-next').onclick = () => { page++; renderRows(); };
   const summaries = { language:['summary-language','library-language'], 'media-features':['summary-features','media-features/batch'], chapters:['summary-chapters','chapters/batch'] };
   const summaryText = (pg, t) => !t?.id ? '尚未检查媒体库。' : pg === 'language' ? `上次检查：${t.summary.blurayMovies} 部原盘 · ${t.summary.completeMovies} 部信息完整 · ${t.summary.missingMovies + t.summary.unknownMovies} 部待补全。`
