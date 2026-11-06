@@ -62,6 +62,25 @@ using(var udf=new UdfReader(large))
 }
 Console.WriteLine(CheckMediaOffset(VirtualUdfImage.Create([
     new("BDMV/index.bdmv",null,bytes.Length,bytes),new("BDMV/STREAM/00294.m2ts","unused-unit-fixture",bytes.Length)])));
+// Title choice: copies of one feature whose marks were rounded apart are one
+// branch, and the copy with the fullest stream table is presented.
+DiscChapterPresentation.Title Feature(string name,double[] marks,int streams,string clip="00070.M2TS",ulong size=55128453120)=>new(name,6301.003,size,[clip],marks,streams);
+double[] marks=[0,164.956,318.109],rounded=[0,164.955,318.108];
+if(Path.GetFileName(DiscChapterPresentation.Choose([Feature("00004.mpls",marks,7),Feature("00800.mpls",rounded,47)],63010240000,55128453120).Path)!="00800.mpls")
+    throw new Exception("Equivalent feature copies must present the fullest stream table.");
+if(Path.GetFileName(DiscChapterPresentation.Choose([Feature("00800.mpls",marks,7),Feature("00004.mpls",marks,7)],63010240000,55128453120).Path)!="00004.mpls")
+    throw new Exception("Equal feature copies must fall back to playlist name order.");
+if(Path.GetFileName(DiscChapterPresentation.Choose([Feature("00001.mpls",marks,47,"00071.M2TS",1),Feature("00004.mpls",marks,7)],63010240000,55128453120).Path)!="00004.mpls")
+    throw new Exception("An exact clip size match must exclude other branches.");
+foreach(var (titles,message) in new (DiscChapterPresentation.Title[],string)[]{
+    ([Feature("00004.mpls",marks,7),Feature("00800.mpls",[0,165.956,318.109],47)],"正片存在不同分支，无法确认章节对应关系。"),
+    ([Feature("00004.mpls",marks,7),Feature("00800.mpls",marks,47,"00071.M2TS")],"正片存在不同分支，无法确认章节对应关系。"),
+    ([Feature("00004.mpls",marks,7)],"无法匹配 Emby 正片版本，保留原播放方式。")})
+{
+    try{DiscChapterPresentation.Choose(titles,titles.Length==1?50000000000:63010240000,0);throw new Exception("Ambiguous or missing feature accepted: "+message);}
+    catch(InvalidDataException e)when(e.Message==message){}
+}
+Console.WriteLine("PASS: feature title choice (rounded marks, fullest stream table, name order, exact size, branches, no match).");
 
 static string CheckMediaOffset(VirtualUdfImage image)
 {

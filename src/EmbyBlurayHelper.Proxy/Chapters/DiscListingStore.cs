@@ -7,7 +7,8 @@ namespace EmbyBlurayHelper.Proxy.Chapters;
 // What Infuse library listings advertise for each disc item. Library syncs never
 // touch the media disks once an item is known: an entry changes only when Emby's
 // own record for the item changes (a rescan), when the item is actually played,
-// or when the virtual disc layout revision changes. Persisted across restarts.
+// or when the virtual disc layout or title selection revision changes. Persisted
+// across restarts.
 internal sealed class DiscListingStore(string? path, ILogger logger)
 {
     internal sealed record Listing(long Length, int ChapterCount, string Playlist, int MetadataBytes);
@@ -31,7 +32,7 @@ internal sealed class DiscListingStore(string? path, ILogger logger)
     // and titles are left out, so metadata edits do not trigger a disc re-read.
     internal static string Key(JsonElement source)
     {
-        var text = new StringBuilder("rev" + VirtualUdfImage.FormatRevision);
+        var text = new StringBuilder("rev" + VirtualUdfImage.FormatRevision + "." + DiscChapterPresentation.SelectionRevision);
         foreach (var name in new[] { "Id", "Container", "Path", "Size", "RunTimeTicks" })
             text.Append('\n').Append(name).Append('=').Append(source.TryGetProperty(name, out var value) ? value.GetRawText() : "-");
         if (source.TryGetProperty("Chapters", out var chapters) && chapters.ValueKind == JsonValueKind.Array)

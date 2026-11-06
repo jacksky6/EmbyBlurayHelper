@@ -8,6 +8,10 @@ namespace EmbyBlurayHelper.Proxy.Chapters;
 
 internal sealed record DiscChapterPresentation(VirtualUdfImage Image, string Signature, string Playlist, int ChapterCount)
 {
+    // Raised when the playlist choice rule changes, so saved listing records
+    // are decided once more under the new rule.
+    internal const int SelectionRevision = 2;
+    internal sealed record Title(string Path, double Length, ulong Size, string[] Clips, double[] Marks, int Streams);
     private (string Path, long Length, long Modified)[] sourceFiles = [];
     internal bool IsCurrent => sourceFiles.All(s => { var f = new FileInfo(s.Path); return f.Exists && f.Length == s.Length && f.LastWriteTimeUtc.Ticks == s.Modified; });
     // Only an authenticated Emby media source is accepted. ISO already carries
@@ -37,25 +41,19 @@ internal sealed record DiscChapterPresentation(VirtualUdfImage Image, string Sig
                 disc.StreamFiles.Add(Path.GetFileName(file).ToUpperInvariant(), new TSStreamFile(BDInfo.IO.FileInfo.FromFullName(file)));
         if (disc.StreamClipFiles.Count == 0) foreach (var file in Directory.EnumerateFiles(clipDirectory).Where(p => Path.GetExtension(p).Equals(".clpi", StringComparison.OrdinalIgnoreCase)))
                 disc.StreamClipFiles.Add(Path.GetFileName(file).ToUpperInvariant(), new TSStreamClipFile(BDInfo.IO.FileInfo.FromFullName(file)));
-        var candidates = new List<(string Path, TSPlaylistFile Playlist)>();
+        var titles = new List<Title>();
         foreach (var file in Directory.EnumerateFiles(playlistDirectory).Where(p => Path.GetExtension(p).Equals(".mpls", StringComparison.OrdinalIgnoreCase)))
         {
             try
             {
                 var p = new TSPlaylistFile(disc, BDInfo.IO.FileInfo.FromFullName(file)); p.Scan(disc.StreamFiles, disc.StreamClipFiles);
-                if (p.StreamClips.Count > 0 && Math.Abs(p.TotalLength - runtime / 10000000d) <= Math.Max(10, runtime / 10000000d * .002)) candidates.Add((file, p));
+                if (p.StreamClips.Count > 0) titles.Add(new(file, p.TotalLength, p.FileSize, p.StreamClips.Select(c => c.Name).ToArray(),
+                    p.Chapters.Where(t => double.IsFinite(t) && t >= 0 && t < p.TotalLength).Distinct().Order().ToArray(), p.PlaylistStreams.Count));
             }
             catch (Exception e) when (e is IOException or InvalidDataException or ArgumentException or IndexOutOfRangeException) { }
         }
-        var size = source.TryGetProperty("Size", out var sizeValue) ? sizeValue.GetInt64() : 0;
-        var exact = candidates.Where(p => size > 0 && p.Playlist.FileSize == (ulong)size).ToArray();
-        var matches = exact.Length > 0 ? exact : candidates.Where(p => Math.Abs(p.Playlist.TotalLength - runtime / 10000000d) <= 2).ToArray();
-        if (matches.Length == 0) throw new InvalidDataException("无法匹配 Emby 正片版本，保留原播放方式。");
-        var first = matches[0].Playlist;
-        var clips = first.StreamClips.Select(c => c.Name).ToArray();
-        if (matches.Skip(1).Any(p => !p.Playlist.StreamClips.Select(c => c.Name).SequenceEqual(clips, StringComparer.OrdinalIgnoreCase) ||
-            !p.Playlist.Chapters.SequenceEqual(first.Chapters))) throw new InvalidDataException("正片存在不同分支，无法确认章节对应关系。");
-        var selected = matches.OrderBy(p => Path.GetFileName(p.Path), StringComparer.Ordinal).First();
+        var selected = Choose(titles, runtime, source.TryGetProperty("Size", out var sizeValue) ? sizeValue.GetInt64() : 0);
+        var clips = selected.Clips;
         var files = new List<VirtualUdfImage.ImageFile>();
         var originals = new List<string> { selected.Path };
         foreach (var name in new[] { "index.bdmv", "MovieObject.bdmv" })
@@ -87,6 +85,21 @@ internal sealed record DiscChapterPresentation(VirtualUdfImage Image, string Sig
         var signature = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
         return new(VirtualUdfImage.Create(files), signature, Path.GetFileName(selected.Path), chapters.Length)
         { sourceFiles = originals.Select(p => { var f = new FileInfo(p); return (f.FullName, f.Length, f.LastWriteTimeUtc.Ticks); }).ToArray() };
+    }
+    // Discs often carry the feature twice: a regional menu entry with a short
+    // stream table next to the full one, with marks rounded a millisecond
+    // apart. Those are one branch; the player gets the fullest stream table.
+    internal static Title Choose(IReadOnlyList<Title> titles, long runtime, long size)
+    {
+        var seconds = runtime / 10000000d;
+        var candidates = titles.Where(t => Math.Abs(t.Length - seconds) <= Math.Max(10, seconds * .002)).ToArray();
+        var exact = candidates.Where(t => size > 0 && t.Size == (ulong)size).ToArray();
+        var matches = exact.Length > 0 ? exact : candidates.Where(t => Math.Abs(t.Length - seconds) <= 2).ToArray();
+        if (matches.Length == 0) throw new InvalidDataException("无法匹配 Emby 正片版本，保留原播放方式。");
+        var first = matches[0];
+        if (matches.Skip(1).Any(t => !t.Clips.SequenceEqual(first.Clips, StringComparer.OrdinalIgnoreCase) || t.Marks.Length != first.Marks.Length ||
+            t.Marks.Zip(first.Marks).Any(m => Math.Abs(m.First - m.Second) > .05))) throw new InvalidDataException("正片存在不同分支，无法确认章节对应关系。");
+        return matches.OrderByDescending(t => t.Streams).ThenBy(t => Path.GetFileName(t.Path), StringComparer.Ordinal).First();
     }
     private static string? Child(string root, string name, bool directory) => (directory ? Directory.EnumerateDirectories(root) : Directory.EnumerateFiles(root))
         .FirstOrDefault(p => Path.GetFileName(p).Equals(name, StringComparison.OrdinalIgnoreCase));
