@@ -59,26 +59,26 @@
       ? `${discs} 部原盘 · ${movies ?? '?'} 部电影 · ${uhd ?? '?'} 部 UHD`
       : '尚未检查媒体库';
     const libsEl = $('#lib-action-libs');
-    if (groups.length >= 2) {
-      libsEl.hidden = false;
-      const allSel = groups.every(l => selected.has(l.id));
-      libsEl.innerHTML = `<button class="lib-action-libs-toggle" id="lib-select-all-link">${allSel ? '取消全选' : '全选'}</button>`
-        + groups.map(l => `<label><input type="checkbox" data-library="${escapeHtml(l.id)}" ${selected.has(l.id) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${escapeHtml(l.name)}</span></label>`).join('');
-    } else {
-      libsEl.hidden = true;
-    }
+    libsEl.hidden = false;
+    const allSel = groups.length > 0 && groups.every(l => selected.has(l.id));
+    libsEl.innerHTML = (groups.length >= 2 ? `<button class="lib-action-libs-toggle" id="lib-select-all-link">${allSel ? '取消全选' : '全选'}</button>` : '')
+      + groups.map(l => `<label><input type="checkbox" data-library="${escapeHtml(l.id)}" ${selected.has(l.id) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${escapeHtml(l.name)}</span></label>`).join('');
     $('#lib-scan').disabled = locked;
     $('#lib-fill-rows').innerHTML = STEPS.map(s => {
       const st = stepState(s);
       const can = runnable(s) && !locked;
       const recheckDisabled = locked || !valid(s) ? 'disabled' : '';
       return `<div class="lib-fill-row" data-state="${st.state}">` +
+        `<div class="lib-fill-row-top">` +
         `<input type="checkbox" data-step="${s.key}" ${chosen[s.key] && runnable(s) ? 'checked' : ''} ${can ? '' : 'disabled'}>` +
         `<span class="lib-fill-row-name">${s.name}</span>` +
-        `<span class="lib-fill-row-count ${st.state === 'on' ? 'on' : ''}">${escapeHtml(st.text)}</span>` +
-        `<button class="text-button" data-goto-step="${s.page}">设置 →</button>` +
-        (s.recheck ? `<label class="lib-fill-row-recheck"><input type="checkbox" data-again="${s.key}" ${again[s.key] ? 'checked' : ''} ${recheckDisabled}>${s.recheck}</label>` : '') +
-        (st.detail ? `<small class="lib-fill-row-detail">${escapeHtml(st.detail)}</small>` : '') +
+        `<span class="lib-fill-row-count ${st.state === 'on' ? 'on' : ''}" style="margin-left:auto">${escapeHtml(st.text)}</span>` +
+        `</div>` +
+        `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">` +
+        (s.recheck ? `<label class="lib-fill-row-recheck"><input type="checkbox" data-again="${s.key}" ${again[s.key] ? 'checked' : ''} ${recheckDisabled}>${s.recheck}</label>` : `<span></span>`) +
+        `<button class="text-button" data-goto-step="${s.page}" style="white-space:nowrap">设置 →</button>` +
+        `</div>` +
+        (st.detail && st.state !== 'off' ? `<small class="lib-fill-row-detail">${escapeHtml(st.detail)}</small>` : '') +
         `</div>`;
     }).join('');
     const picked = STEPS.filter(s => chosen[s.key] && runnable(s));
