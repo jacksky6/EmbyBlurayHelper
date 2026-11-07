@@ -20,6 +20,7 @@
     <PackageReference Include="BDInfo" Version="0.8.0" />
     <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
     <Compile Include="../EmbyBlurayHelper.Proxy/EmbyProxy.cs" Link="Core/EmbyProxy.cs" />
+    <Compile Include="../EmbyBlurayHelper.Proxy/VirtualMediaName.cs" Link="Core/VirtualMediaName.cs" />
     <Compile Include="../EmbyBlurayHelper.Proxy/Chapters/*.cs" Link="InfuseChapters/%(Filename)%(Extension)" />
     <Compile Include="../EmbyBlurayHelper.Proxy/DolbyVision/*.cs" Link="DolbyVision/%(Filename)%(Extension)" />
     <Compile Include="../EmbyBlurayHelper.Proxy/EmbyToolProcess.cs" Link="Core/EmbyToolProcess.cs" />

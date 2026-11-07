@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DiscUtils.Udf;
+using EmbyBlurayHelper.Proxy;
 using EmbyBlurayHelper.Proxy.Chapters;
 
 internal static class RemoteDiscCheck
@@ -19,16 +20,16 @@ internal static class RemoteDiscCheck
         using(var nativePlayback=JsonDocument.Parse(await client.GetStringAsync(settings.RootElement.GetProperty("embyUrl").GetString()!.TrimEnd('/')+"/Items/"+itemId+"/PlaybackInfo")))
         {
             var native=nativePlayback.RootElement.GetProperty("MediaSources")[0];
-            var allowed=new HashSet<string>(["Container","Size","Path","SupportsDirectPlay","SupportsDirectStream"]);
+            var allowed=new HashSet<string>(["Container","Size","Path","Name","SupportsDirectPlay","SupportsDirectStream"]);
             var expectedFields=JsonNode.Parse(native.GetRawText())!.AsObject();
             var actualFields=JsonNode.Parse(source.GetRawText())!.AsObject();
             foreach(var name in allowed){expectedFields.Remove(name);actualFields.Remove(name);}
             if(!JsonNode.DeepEquals(expectedFields,actualFields))
                 throw new Exception("Virtual ISO presentation changed native tracks, chapters, duration or reader hints.");
             var nativePath=native.GetProperty("Path").GetString()!;
-            var separator=nativePath.Contains('\\')?'\\':'/';
-            if(source.GetProperty("Path").GetString()!=nativePath.TrimEnd('/','\\')+separator+"EmbyBlurayHelper.iso")
-                throw new Exception("Virtual ISO presentation uses inconsistent path separators.");
+            var named=VirtualMediaName.Chapters(nativePath);
+            if(source.GetProperty("Path").GetString()!=named.Path||source.GetProperty("Name").GetString()!=named.FileName)
+                throw new Exception("Virtual ISO presentation did not preserve the original release name.");
             Console.WriteLine("PASS: virtual ISO preserves native media-source fields, tracks, chapters, duration and reader hints; path separators match the source.");
         }
         var canonical="/Videos/"+itemId+"/stream?Static=true&MediaSourceId="+source.GetProperty("Id").GetString();
@@ -56,7 +57,7 @@ internal static class RemoteDiscCheck
         {
             var item=listing.RootElement.GetProperty("Items")[0];
             var sizes=new List<long>();if(item.TryGetProperty("Size",out var size))sizes.Add(size.GetInt64());
-            if(item.GetProperty("Container").GetString()!="blurayiso"||!item.GetProperty("Path").GetString()!.EndsWith("EmbyBlurayHelper.iso",StringComparison.Ordinal))
+            if(item.GetProperty("Container").GetString()!="blurayiso"||item.GetProperty("Path").GetString()!=VirtualMediaName.Chapters(original.GetProperty("Path").GetString()!).Path)
                 throw new Exception("Library listing with Fields="+fields+" still advertises the BDMV folder.");
             if(item.TryGetProperty("MediaSources",out var listed))
                 foreach(var s in listed.EnumerateArray()){if(s.GetProperty("Container").GetString()!="blurayiso")throw new Exception("Listed source with Fields="+fields+" is not ISO.");sizes.Add(s.GetProperty("Size").GetInt64());}

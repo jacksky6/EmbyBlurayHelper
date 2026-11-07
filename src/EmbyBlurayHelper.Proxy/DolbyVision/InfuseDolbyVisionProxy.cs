@@ -66,7 +66,8 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
             {
                 var match = matches.FirstOrDefault(m => m.Source == Text(source["Id"])); if (match.Presentation is null) continue;
                 var plan = match.Presentation.Plan;
-                source["Container"] = "mkv"; source["Path"] = VirtualPath(match.Path); source["Size"] = plan.Length;
+                var name = VirtualMediaName.DolbyVision(match.Path);
+                source["Container"] = "mkv"; source["Path"] = name.Path; source["Name"] = name.FileName; source["Size"] = plan.Length;
                 source["SupportsDirectPlay"] = true; source["SupportsDirectStream"] = true; source["SupportsTranscoding"] = false;
                 source["DirectStreamUrl"] = "/emby/Videos/" + Uri.EscapeDataString(id) + "/stream.mkv?Static=true&MediaSourceId=" + Uri.EscapeDataString(match.Source) + "&HelperDv=" + plan.Signature + Caller(context);
                 source.Remove("TranscodingUrl"); source.Remove("TranscodingContainer"); source["MimeType"] = "video/x-matroska";
@@ -75,7 +76,7 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
             if (matches.Count == 1 && (obj["MediaSources"] is not JsonArray all || all.Count == 1))
             {
                 if (obj.ContainsKey("Container")) obj["Container"] = "mkv";
-                if (obj.ContainsKey("Path")) obj["Path"] = VirtualPath(matches[0].Path);
+                if (obj.ContainsKey("Path")) obj["Path"] = VirtualMediaName.DolbyVision(matches[0].Path).Path;
                 if (obj.ContainsKey("Size")) obj["Size"] = matches[0].Presentation.Plan.Length;
                 RewriteStreams(obj); changed = true;
             }
@@ -83,7 +84,6 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
         if (changed) logger.LogInformation("Infuse DV: metadata {Route}; {Count} eligible disc items; virtual MKV with on-demand P8.1, no whole-film conversion.", context.Request.Path.Value, known.Count);
         return changed ? Encoding.UTF8.GetBytes(root!.ToJsonString()) : null;
     }
-    private static string VirtualPath(string source) => source.TrimEnd('/', '\\') + "/EmbyBlurayHelper.P81.mkv";
     private static void RewriteStreams(JsonObject obj)
     {
         if (obj["MediaStreams"] is not JsonArray streams) return;
@@ -151,7 +151,7 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
             var header = await runtime.Header(presentation, session, context.RequestAborted);
             context.Response.StatusCode = partial ? 206 : 200; context.Response.ContentType = "video/x-matroska"; context.Response.ContentLength = end - start + 1;
             context.Response.Headers.AcceptRanges = "bytes"; context.Response.Headers.CacheControl = "no-store"; context.Response.Headers.ETag = "\"" + plan.Signature + "\"";
-            context.Response.Headers.ContentDisposition = "inline; filename=EmbyBlurayHelper.P81.mkv";
+            context.Response.Headers.ContentDisposition = VirtualMediaName.DolbyVision(Text(source, "Path")).ContentDisposition;
             if (partial) context.Response.Headers.ContentRange = $"bytes {start}-{end}/{plan.Length}";
             if (!HttpMethods.IsHead(context.Request.Method)) await Copy(context, presentation, session, header, start, end);
             logger.LogInformation("Infuse DV: item {Item}; {Method} bytes {Start}-{End}/{Length}; on-demand P8.1.", itemId, context.Request.Method, start, end, plan.Length);

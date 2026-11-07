@@ -4,7 +4,7 @@ using BDInfo;
 namespace EmbyBlurayHelper.Proxy;
 
 internal sealed record BlurayPlaylist(string Root, int Number);
-internal sealed record BlurayMedia(IReadOnlyDictionary<ushort, string>? Languages, BlurayPlaylist? Playlist);
+internal sealed record BlurayMedia(IReadOnlyDictionary<ushort, string>? Languages, BlurayPlaylist? Playlist, string SourcePath = "");
 
 internal static class BlurayLanguageMap
 {
@@ -89,7 +89,7 @@ internal static class BlurayLanguageMap
                 trackTypes[group.Key] = group.First().Type;
         logger.LogInformation("Infuse UHD language patch: {Count} PID language entries from {CountPlaylists} matching playlists.",
             languages.Count, selected.Length);
-        return new(languages.Count > 0 ? languages : null, playback);
+        return new(languages.Count > 0 ? languages : null, playback, path);
     }
 
     private static Dictionary<ushort, string> Unambiguous(IEnumerable<Dictionary<ushort, string>> maps) => maps

@@ -38,7 +38,7 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
             if (media is not null)
             {
                 if (config.EnableInfuseMultiClipPlayback && media.Playlist is not null && await TryStreamPlaylistAsync(context, media)) return;
-                if (config.EnableInfuseLanguagePatch && media.Languages is not null && await TryStreamPatchedAsync(context, media.Languages)) return;
+                if (config.EnableInfuseLanguagePatch && media.Languages is not null && await TryStreamPatchedAsync(context, media.Languages, media.SourcePath)) return;
             }
         }
         using var request = CreateRequest(context, Target(context), context.Request.Method, true);
@@ -162,6 +162,7 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
             context.Response.ContentLength = length;
             context.Response.Headers.AcceptRanges = "bytes";
             context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.ContentDisposition = VirtualMediaName.MultiClip(title.Root).ContentDisposition;
             if (partial) context.Response.Headers.ContentRange = $"bytes {start}-{end}/{total}";
             if (input is not null)
             {
@@ -183,7 +184,7 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
 
     private sealed record WholeClipPlan(WholeClipPlaylist? Playlist, string Reason);
 
-    private async Task<bool> TryStreamPatchedAsync(HttpContext context, IReadOnlyDictionary<ushort, string> languages)
+    private async Task<bool> TryStreamPatchedAsync(HttpContext context, IReadOnlyDictionary<ushort, string> languages, string sourcePath)
     {
         var target = Target(context);
         long visibleStart = 0, upstreamStart = 0, visibleLength = 0, totalLength = 0;
@@ -232,6 +233,7 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
         context.Response.Headers.Remove("Content-MD5");
         context.Response.Headers.Remove("Digest");
         context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.ContentDisposition = VirtualMediaName.Language(sourcePath).ContentDisposition;
         context.Response.ContentLength = visibleLength;
         if (expandedRange is not null)
         {

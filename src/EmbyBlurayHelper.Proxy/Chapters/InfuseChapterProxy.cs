@@ -67,7 +67,8 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         {
             var sourceId = Text(source["Id"]);
             if (sourceId is null || !known.TryGetValue(sourceId, out var match) || match.Listing is null) continue;
-            source["Container"] = "blurayiso"; source["Size"] = match.Listing.Length; source["Path"] = IsoPath(match.Path);
+            var name = VirtualMediaName.Chapters(match.Path);
+            source["Container"] = "blurayiso"; source["Size"] = match.Listing.Length; source["Path"] = name.Path; source["Name"] = name.FileName;
             // Preserve native media-source hints. Infuse can select a different
             // reader when extra URL/MIME hints are injected into the DTO. The
             // authenticated stream route supplies the explicit ISO redirect.
@@ -80,7 +81,7 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         if (known.Count == 1 && known.Values.Single() is { Listing: { } listing } single)
         {
             if (obj.ContainsKey("Container")) obj["Container"] = "blurayiso";
-            if (Text(obj["Path"]) == single.Path) obj["Path"] = IsoPath(single.Path);
+            if (Text(obj["Path"]) == single.Path) obj["Path"] = VirtualMediaName.Chapters(single.Path).Path;
             if (obj.ContainsKey("Size")) obj["Size"] = listing.Length;
             changed = true;
             if (logDetail) logger.LogInformation("Infuse chapters: item {ItemId}; {Count} saved Emby chapters in virtual ISO, playlist {Playlist}, navigation {Bytes} bytes; original media is read on demand; metadata route {Route}.", itemId, listing.ChapterCount, listing.Playlist, listing.MetadataBytes, context.Request.Path.Value);
@@ -131,7 +132,6 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
     }
 
     private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
-    private static string IsoPath(string source) => source.TrimEnd('/', '\\') + (source.Contains('\\') ? '\\' : '/') + "EmbyBlurayHelper.iso";
 
     // Upstream checks run with the caller's own Emby credentials, never the
     // management API key.
@@ -266,11 +266,12 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         if (!response.IsSuccessStatusCode) { context.Response.StatusCode = (int)response.StatusCode; return true; }
         await using var body = await response.Content.ReadAsStreamAsync(context.RequestAborted);
         using var document = await JsonDocument.ParseAsync(body, cancellationToken: context.RequestAborted);
-        DiscChapterPresentation? presentation = null;
+        DiscChapterPresentation? presentation = null; string originalPath = "";
         if (document.RootElement.TryGetProperty("Items", out var items)) foreach (var item in items.EnumerateArray())
             {
                 if (item.GetProperty("Id").GetString() != itemId || !item.TryGetProperty("MediaSources", out var sources)) continue;
-                foreach (var source in sources.EnumerateArray()) if (source.GetProperty("Id").GetString() == sourceId || sourceId.Length == 0 && sources.GetArrayLength() == 1) { presentation = Build(source, SourceOf(item, source)); break; }
+                foreach (var source in sources.EnumerateArray()) if (source.GetProperty("Id").GetString() == sourceId || sourceId.Length == 0 && sources.GetArrayLength() == 1)
+                    { presentation = Build(source, SourceOf(item, source)); originalPath = source.GetProperty("Path").GetString() ?? ""; break; }
             }
         if (signature.Length == 0 && presentation is null) return false;
         if (presentation is null || signature.Length > 0 && !string.Equals(signature, presentation.Signature, StringComparison.Ordinal)) { context.Response.StatusCode = 409; return true; }
@@ -316,7 +317,7 @@ internal sealed class InfuseChapterProxy(ProxyConfiguration config, HttpClient c
         }
         context.Response.StatusCode = partial ? 206 : 200; context.Response.ContentType = "video/iso";
         context.Response.ContentLength = end - start + 1; context.Response.Headers.AcceptRanges = "bytes"; context.Response.Headers.CacheControl = "no-store";
-        context.Response.Headers.ETag = "\"" + signature + "\""; context.Response.Headers.ContentDisposition = "inline; filename=EmbyBlurayHelper.iso";
+        context.Response.Headers.ETag = "\"" + signature + "\""; context.Response.Headers.ContentDisposition = VirtualMediaName.Chapters(originalPath).ContentDisposition;
         if (partial) context.Response.Headers.ContentRange = $"bytes {start}-{end}/{image.Length}";
         trace.Phase = "image-stream";
         if (!HttpMethods.IsHead(context.Request.Method))

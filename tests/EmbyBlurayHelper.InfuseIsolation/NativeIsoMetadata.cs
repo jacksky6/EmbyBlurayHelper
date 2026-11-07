@@ -45,8 +45,8 @@ internal sealed class NativeIsoMetadata(JsonElement donor, Func<JsonElement, Dis
                     var presentation = virtualPresentation(source.Deserialize<JsonElement>());
                     if (presentation is null) continue;
                     var originalPath = source["Path"]!.GetValue<string>();
-                    var separator = originalPath.Contains('\\') ? '\\' : '/';
-                    native["Path"] = originalPath.TrimEnd('/', '\\') + separator + "EmbyBlurayHelper.iso";
+                    var named = EmbyBlurayHelper.Proxy.VirtualMediaName.Chapters(originalPath);
+                    native["Path"] = named.Path; native["Name"] = named.FileName;
                     native["Container"] = "blurayiso";
                     native["Size"] = presentation.Image.Length;
                     native["SupportsDirectPlay"] = true;

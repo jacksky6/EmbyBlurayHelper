@@ -9,6 +9,19 @@
 
 「全局设置 → 媒体库处理范围」可永久排除不需要处理的库，同时约束检查、批量任务和新片自动补全。新增媒体库默认允许，需要配套插件 0.1.9；详见[全局处理范围](LIBRARY-PROCESSING-SCOPE.md)。
 
+## Infuse 虚拟文件名
+
+所有辅助播放流统一保留完整的原始发布名，包括名称末尾的小组信息。BDMV 使用原盘文件夹名；ISO 使用原文件名，仅移除 `.iso` 扩展名，再按实际功能追加后缀：
+
+| 功能 | 虚拟文件名 |
+| --- | --- |
+| 章节虚拟 ISO | `原发布名.EmbyBlurayHelper.Chapters.iso` |
+| 杜比视界 P8.1 | `原发布名.EmbyBlurayHelper.P81.mkv` |
+| 多片段播放兼容 | `原发布名.EmbyBlurayHelper.MultiClip.m2ts` |
+| 视频流语言补全 | `原发布名.EmbyBlurayHelper.Language.m2ts` |
+
+虚拟 ISO / MKV 的媒体源名称、展示路径与 HTTP 文件名保持一致；M2TS 兼容流提供对应的 HTTP 文件名。中文通过标准 UTF-8 文件名字段传递。原盘文件、媒体库影片标题和稳定播放地址均不改动，也不产生整片输出文件。升级后如 Infuse 仍显示旧名称，刷新该连接的媒体库，再退出影片重新进入。
+
 ## Windows
 
 Emby 插件从 **0.1.7** 起提供自己的更新配置页：先升级 Helper，再在 Emby「插件 → EmbyBlurayHelper」中检查并安装配套 DLL。首次仍需手动安装支持更新的 DLL，此后不必每次 SSH 复制；成功后手动重启 Emby 生效。默认更新来源为同机 `http://127.0.0.1:8099`，无需 Helper 密码。详见 [插件更新](PLUGIN-UPDATES.md)。

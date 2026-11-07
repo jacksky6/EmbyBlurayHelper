@@ -5,6 +5,7 @@ using System.Text.Json;
 var checks = 0;
 void Check(bool value, string message) { if (!value) throw new Exception(message); checks++; Console.WriteLine("PASS " + message); }
 await PlaybackReportChecks.Run(Check);
+await VirtualMediaNameChecks.Run(Check);
 await CoreChecks.Run(Check);
 foreach (var n in new ulong[] { 0, 1, 126, 127, 128, 16383, 100000000000 })
 { var bytes = Ebml.Size(n); var pos = 0; Check(Ebml.Vint(bytes, ref pos) == n && pos == bytes.Length, "EBML size " + n); }

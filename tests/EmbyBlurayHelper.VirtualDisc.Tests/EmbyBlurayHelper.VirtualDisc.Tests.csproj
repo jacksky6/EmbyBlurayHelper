@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/VirtualMediaName.cs" Link="VirtualMediaName.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/Chapters/VirtualUdfImage.cs" Link="Chapters/VirtualUdfImage.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/Chapters/DiscChapterPresentation.cs" Link="Chapters/DiscChapterPresentation.cs" />
     <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />

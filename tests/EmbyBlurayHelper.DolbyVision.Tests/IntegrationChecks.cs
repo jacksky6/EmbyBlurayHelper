@@ -39,6 +39,9 @@ internal static class IntegrationChecks
         {
             var item = parsed.RootElement.GetProperty("Items")[0]; var s = item.GetProperty("MediaSources")[0];
             check(s.GetProperty("Container").GetString() == "mkv" && s.GetProperty("Size").GetInt64() == plan.Length, "library metadata describes the virtual MKV");
+            var named = VirtualMediaName.DolbyVision(source.GetProperty("Path").GetString()!);
+            check(s.GetProperty("Path").GetString() == named.Path && s.GetProperty("Name").GetString() == named.FileName,
+                "virtual MKV metadata retains the original release name and group");
             check(s.GetProperty("MediaStreams").EnumerateArray().Count(s => s.GetProperty("Type").GetString() == "Video") == 1, "metadata removes the discarded enhancement-layer video track");
         }
         var disabled = new EmbyProxy(config with { EnableInfuseDolbyVision = false, EnableInfuseChapters = false }, client, memory, logger, dvRuntime: runtime);
@@ -49,6 +52,8 @@ internal static class IntegrationChecks
         }
         var head = await Call("HEAD", route, query);
         check(head.Context.Response.StatusCode == 200 && head.Context.Response.ContentLength == plan.Length && head.Bytes.Length == 0, "HEAD advertises exact seekable length without a media body");
+        check(System.Net.Http.Headers.ContentDispositionHeaderValue.Parse(head.Context.Response.Headers.ContentDisposition.ToString()).FileNameStar ==
+            VirtualMediaName.DolbyVision(source.GetProperty("Path").GetString()!).FileName, "virtual MKV HTTP filename matches metadata, including Unicode");
         var headerA = await Call("GET", route, query, "bytes=0-1023"); var headerB = await Call("GET", route, query, "bytes=32-127");
         check(headerA.Context.Response.StatusCode == 206 && headerB.Bytes.SequenceEqual(headerA.Bytes[32..128]), "overlapping header ranges return identical bytes");
         foreach (var index in new[] { 0, 40, 41, plan.Segments.Count - 1 })

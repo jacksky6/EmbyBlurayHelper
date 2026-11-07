@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/EmbyProxy.cs" Link="Proxy/EmbyProxy.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/VirtualMediaName.cs" Link="Proxy/VirtualMediaName.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/Chapters/*.cs" Link="Proxy/Chapters/%(Filename)%(Extension)" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/DolbyVision/*.cs" Link="Proxy/DolbyVision/%(Filename)%(Extension)" />
     <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs" Link="Disc/IsoDiscMetadata.cs" />
