@@ -16,6 +16,8 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
     private readonly InfuseChapterProxy chapterProxy = new(config, client, cache, logger, chapterPresentationFactory, discListings);
     private readonly InfuseDolbyVisionProxy dolbyProxy = new(config, client, dvRuntime ?? new DvRuntime(DvOptions.From(config), logger), logger);
     private static readonly Regex StreamPath = new("^(?:/emby)?/videos/(?<id>[^/]+)/stream(?:\\.[a-z0-9]+)?/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PlaybackReportPath = new("^(?:/emby)?/sessions/playing(?:/(?:progress|stopped))?/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    internal const int MaxBufferedPlaybackReportBytes = 1024 * 1024;
     private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
     { "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Host" };
 
@@ -40,6 +42,8 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
             }
         }
         using var request = CreateRequest(context, Target(context), context.Request.Method, true);
+        if (request.Content is not null && context.Request.ContentLength is null && IsPlaybackReport(context.Request) &&
+            !await BufferPlaybackReportAsync(context, request)) return;
         var chapterMetadata = chapterProxy.IsMetadata(context);
         var dolbyMetadata = dolbyProxy.IsMetadata(context);
         if (chapterMetadata || dolbyMetadata) { request.Headers.AcceptEncoding.Clear(); request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity")); }
@@ -261,11 +265,50 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
 
     private Uri Target(HttpContext context) => new(config.UpstreamBaseUrl.TrimEnd('/') + context.Request.Path + context.Request.QueryString);
 
+    private static bool IsPlaybackReport(HttpRequest request) =>
+        HttpMethods.IsPost(request.Method) && PlaybackReportPath.IsMatch(request.Path.Value ?? "");
+
+    private async Task<bool> BufferPlaybackReportAsync(HttpContext context, HttpRequestMessage request)
+    {
+        // Emby 4.10's request binder can ignore chunked playback JSON. Only
+        // lengthless playback reports are buffered; media/uploads keep streaming.
+        using var body = new MemoryStream();
+        var buffer = new byte[16 * 1024];
+        while (true)
+        {
+            var read = await context.Request.Body.ReadAsync(buffer.AsMemory(0,
+                Math.Min(buffer.Length, MaxBufferedPlaybackReportBytes + 1 - (int)body.Length)), context.RequestAborted);
+            if (read == 0) break;
+            if (body.Length + read > MaxBufferedPlaybackReportBytes)
+            {
+                logger.LogWarning("Playback report exceeded the {Limit} byte buffering limit; request was not forwarded.", MaxBufferedPlaybackReportBytes);
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                context.Response.ContentLength = 0;
+                return false;
+            }
+            body.Write(buffer, 0, read);
+        }
+        var original = request.Content!;
+        var content = new ByteArrayContent(body.GetBuffer(), 0, (int)body.Length);
+        foreach (var header in original.Headers)
+            if (!header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        request.Content = content;
+        original.Dispose();
+        return true;
+    }
+
     internal static HttpRequestMessage CreateRequest(HttpContext context, Uri uri, string method, bool copyBody)
     {
         var request = new HttpRequestMessage(new HttpMethod(method), uri);
-        if (copyBody && (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding")))
+        if (copyBody && (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding") ||
+            context.Request.ContentLength is null && IsPlaybackReport(context.Request)))
+        {
             request.Content = new StreamContent(context.Request.Body);
+            // StreamContent cannot infer a Kestrel request stream's length.
+            // Preserve the validated inbound framing instead of switching to chunked.
+            if (context.Request.ContentLength is long length) request.Content.Headers.ContentLength = length;
+        }
         foreach (var header in context.Request.Headers)
         {
             if (HopByHop.Contains(header.Key) || header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)) continue;

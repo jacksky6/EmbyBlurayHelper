@@ -28,7 +28,7 @@ jobs:
           dotnet-version: 8.0.x
       - name: Verify transport language patching
         run: dotnet run --project tests/EmbyBlurayHelper.Proxy.Tests -c Release
-      - name: Verify Dolby Vision range, cache and cancellation invariants
+      - name: Verify playback reports and Dolby Vision invariants
         run: dotnet run --project tests/EmbyBlurayHelper.DolbyVision.Tests -c Release
       - name: Verify library language tasks
         run: dotnet run --project tests/EmbyBlurayHelper.Library.Tests -c Release

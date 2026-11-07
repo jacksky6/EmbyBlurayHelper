@@ -189,9 +189,12 @@ node tests/check-local-dolby-vision.cjs --item 1886 --continuous
 另有独立待查项：同一时间窗 Emby 的 `POST /Sessions/Playing` 返回
 12 次 HTTP 400，异常为 `ArgumentNullException (Parameter 'key')`，
 堆栈位于 `SessionInfo.GetOrAddPlaySessionInfo` / `OnPlaybackStart`。
-前置短样本实验已经记录同类异常，原因尚未确认；这属于播放状态上报，
-本次实机播放与 DV 转换通过不代表进度 / 续播同步也已通过。后续应单独
-核验这一项，不据此认定媒体转换失败，也不声称 Emby 日志完全无错误。
+前置短样本实验已经记录同类异常，当时原因尚未确认；这属于播放状态
+上报，本次实机播放与 DV 转换通过不代表进度 / 续播同步也已通过。
+同日后续已复现并修复：代理丢失已知请求体长度，触发 Emby 漏读分块
+传输的 JSON。真实会话的开始、进度、停止上报及状态回读验证通过，
+详见 [播放状态上报修复记录](PLAYBACK-REPORTS.md)。Apple TV 实际影片的
+续播仍应与上述服务端状态验证区分，不据此声称设备续播测试已完成。
 
 本轮不包含 DSM / Linux / macOS 实机验证，也不证明整片连续播放、全部
 音轨 / 字幕切换、续播、其他帧率或复杂原盘结构均已兼容。
