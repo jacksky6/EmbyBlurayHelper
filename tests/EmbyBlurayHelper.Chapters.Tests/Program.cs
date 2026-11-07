@@ -139,7 +139,8 @@ sealed class Backend : HttpMessageHandler
             result=new { verified=!BreakReadBack, signature=Signatures[id], count=3, playlist="00800.MPLS", seconds=new[]{0,10,20} };
         }
         else if(path.EndsWith("/Info/Public")) result=new { Id=Server };
-        else if(path.EndsWith("/VirtualFolders")) result=Groups.Keys.Select(id=>new { ItemId=id,Name="媒体库"+id });
+        else if(path.EndsWith("/VirtualFolders")) result=Groups.Keys.Select(id=>new { ItemId=id,Name="媒体库"+id,CollectionType="" })
+            .Append(new { ItemId="collections",Name="合集",CollectionType="boxsets" });
         else if(path.EndsWith("/Items"))
         {
             var q=System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);

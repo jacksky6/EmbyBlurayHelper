@@ -45,7 +45,8 @@ internal sealed class MediaFeatureCatalog(SettingsStore settings, HttpClient cli
     {
         var raw = await Read(config, "Library/VirtualFolders", token);
         if (raw.ValueKind != JsonValueKind.Array) throw new InvalidDataException("Emby 未返回媒体库列表。");
-        var groups = raw.EnumerateArray().Select(l => new FeatureLibrary { Id = Text(l, "ItemId"), Name = Text(l, "Name") }).ToList();
+        var groups = raw.EnumerateArray().Where(l => SettingsStore.LibraryTypeAllowed(Text(l, "CollectionType")))
+            .Select(l => new FeatureLibrary { Id = Text(l, "ItemId"), Name = Text(l, "Name") }).ToList();
         if (groups.Any(l => l.Id.Length == 0) || groups.Select(l => l.Id).Distinct().Count() != groups.Count)
             throw new InvalidDataException("Emby 媒体库 ID 缺失或重复，无法生成可靠计划。");
         var server = await Read(config, "System/Info/Public", token);
@@ -55,9 +56,8 @@ internal sealed class MediaFeatureCatalog(SettingsStore settings, HttpClient cli
     }
     internal async Task Movies(HelperSettings config, string libraryId, Action<JsonElement> receive, CancellationToken token, Action? pageCompleted = null)
     {
-        var server = await Read(config, "System/Info/Public", token);
-        if (!SettingsStore.LibraryAllowed(config, Text(server, "Id"), libraryId))
-            throw new InvalidOperationException("该媒体库已在全局设置中排除，请重新检查。");
+        if (!(await Libraries(config, token)).Any(l => l.Id == libraryId))
+            throw new InvalidOperationException("该媒体库已排除、已删除或属于系统合集，请重新检查。");
         var visited = new HashSet<string>(StringComparer.Ordinal);
         for (var offset = 0; ;)
         {

@@ -21,6 +21,11 @@ try
     var scope = new LibraryScopeService(store, http, log);
     var view = await scope.Read(default);
     Check(view.AllowedCount == 3 && view.ExcludedCount == 0, "first use allows every library, regardless of type");
+    Check(view.Libraries.All(l => l.Id != "collections") && view.Libraries.Any(l => l.Name == "合集" && l.Id == "movies"), "system collections are hidden by type while a real movie library named Collections is retained");
+    Check(!SettingsStore.LibraryTypeAllowed(" BoXsEtS ") && SettingsStore.LibraryTypeAllowed(null) && SettingsStore.LibraryTypeAllowed("movies"), "only the system collection type is filtered; unset and ordinary library types remain eligible");
+    store.Save(store.Current with { ExcludedLibrariesByServer = new() { ["server-one"] = ["collections"] } });
+    view = await scope.Read(default);
+    Check(view.AllowedCount == 3 && view.ExcludedCount == 0, "a previously saved collection exclusion does not affect visible library counts");
     view = await scope.Save(new("server-one", ["tv"]), default);
     Check(view.AllowedCount == 2 && view.Synchronized && backend.Excluded.SequenceEqual(["tv"]), "policy is confirmed by Emby before it is committed");
     Check(new SettingsStore(root).Current.ExcludedLibrariesByServer["server-one"].SequenceEqual(["tv"]), "exclusions survive a Helper restart or upgrade");
@@ -35,6 +40,9 @@ try
     Check(view.Libraries.Single(l => l.Id == "new").Allowed, "new library is allowed automatically");
     var catalog = new MediaFeatureCatalog(store, http);
     Check(!(await catalog.Libraries(store.Current, default)).Any(l => l.Id == "tv"), "shared batch catalog excludes disallowed libraries");
+    Check(!(await catalog.Libraries(store.Current, default)).Any(l => l.Id == "collections"), "system collections do not enter feature or chapter batch catalogs");
+    await Reject(async () => await catalog.Movies(store.Current, "collections", _ => { }, default), "direct enumeration cannot scan a system collection");
+    await Reject(async () => await scope.Save(new("server-one", ["collections"]), default), "stale forms cannot reintroduce a system collection as a configurable library");
     await Reject(async () => await catalog.Movies(store.Current, "tv", _ => { }, default), "direct enumeration cannot bypass the policy");
     var before = SettingsStore.ScopeStamp(store.Current);
     await Reject(async () => await scope.Save(new("other-server", ["movies"]), default), "stale server ID is rejected");
@@ -103,9 +111,10 @@ sealed class ScopeBackend : HttpMessageHandler
         if (path.EndsWith("Info/Public")) response = new { Id = Server };
         else if (path.EndsWith("VirtualFolders"))
         {
-            var folders = new List<object> { new { ItemId = "movies", Name = "Movies", CollectionType = "movies", Locations = new[] { "/media/movies" } },
+            var folders = new List<object> { new { ItemId = "movies", Name = "合集", CollectionType = "movies", Locations = new[] { "/media/movies" } },
                 new { ItemId = "tv", Name = TvName, CollectionType = "tvshows", Locations = new[] { "/media/tv" } },
-                new { ItemId = "music", Name = "Music", CollectionType = "music", Locations = new[] { "/media/music" } } };
+                new { ItemId = "music", Name = "Music", CollectionType = "music", Locations = new[] { "/media/music" } },
+                new { ItemId = "collections", Name = "Renamed Collections", CollectionType = "BoXsEtS", Locations = Array.Empty<string>() } };
             if (NewLibrary) folders.Add(new { ItemId = "new", Name = "New", CollectionType = "tvshows", Locations = new[] { "/media/new" } });
             response = folders;
         }

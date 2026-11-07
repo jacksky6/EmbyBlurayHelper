@@ -42,7 +42,7 @@ internal sealed class LibraryScopeService(SettingsStore settings, HttpClient cli
         if (id.Length == 0) throw new InvalidDataException("Emby 未返回服务器 ID，无法保存可靠的处理范围。");
         var raw = await Send(config, "Library/VirtualFolders", null, token);
         if (raw.ValueKind != JsonValueKind.Array) throw new InvalidDataException("Emby 未返回媒体库列表。");
-        var libraries = raw.EnumerateArray().Select(l => new ScopeLibrary(MediaFeatureCatalog.Text(l, "ItemId"),
+        var libraries = raw.EnumerateArray().Where(l => SettingsStore.LibraryTypeAllowed(MediaFeatureCatalog.Text(l, "CollectionType"))).Select(l => new ScopeLibrary(MediaFeatureCatalog.Text(l, "ItemId"),
             MediaFeatureCatalog.Text(l, "Name"), MediaFeatureCatalog.Text(l, "CollectionType"),
             l.TryGetProperty("Locations", out var locations) && locations.ValueKind == JsonValueKind.Array
                 ? locations.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String).Select(v => v.GetString()!).Where(v => !string.IsNullOrWhiteSpace(v)).ToArray() : [],
@@ -58,7 +58,7 @@ internal sealed class LibraryScopeService(SettingsStore settings, HttpClient cli
             var actual = plugin.GetProperty("excludedLibraryIds").EnumerateArray().Select(v => v.GetString()!).ToHashSet(StringComparer.Ordinal);
             var roots = libraries.Where(l => !l.Allowed).SelectMany(l => l.Locations).ToHashSet(StringComparer.Ordinal);
             var projectionMatches = roots.SetEquals(SettingsStore.ExcludedPaths(config)) && (expected.Length == 0 || config.ScopeServerId == id);
-            return new(id, libraries, true, actual.SetEquals(expected) && projectionMatches, "新增媒体库默认允许处理；取消勾选并保存后，检查、批量补全和新片自动补全均跳过该库。");
+            return new(id, libraries, true, actual.SetEquals(expected) && projectionMatches, "新增媒体库默认允许处理；系统合集自动过滤。取消勾选并保存后，检查、批量补全和新片自动补全均跳过该库。");
         }
         catch (NotSupportedException e) { return new(id, libraries, false, false, e.Message); }
     }

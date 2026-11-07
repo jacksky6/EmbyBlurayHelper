@@ -6,7 +6,7 @@
 
 ## 安装与连接
 
-1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
+1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
 2. 打开 `http://NAS-IP:8099`，用户名 `admin`，密码 `123456`。也可从 DSM 的应用图标打开。
 3. 在 DSM「控制面板 → 共享文件夹 → 电影所在共享文件夹 → 编辑 → 权限」中，
    选择「系统内部用户」，给 `embyblurayhelper` **只读**权限。对所有需要读取的媒体共享文件夹重复此步骤。
@@ -62,6 +62,10 @@ Emby 调用 `probe.sh` 时，只读取单独导出的 `probe-settings.json`，�
 旧版“已接入但补全已暂停”的配置会保留，可打开开关重新启用，也可使用提示下的“恢复原探测器”操作。已接入表示 Emby 已配置为调用本工具，已有影片需再次发生实际媒体探测才会更新语言信息。
 
 ## 升级与卸载
+
+### 0.2.0-28：过滤系统合集
+
+按 `boxsets` 类型固定过滤 Emby 系统合集，不再显示在全局范围和批量检查中，也不计入库总数。合集成员按原电影库处理，同名普通电影库保留。升级后重新检查媒体库即可，既有核验记录保留，不因此重新探测；DLL 仍为 **0.1.10**，无需为这项修复替换插件或重启 Emby。
 
 ### 0.2.0-27：处理范围保存状态
 
@@ -166,7 +170,7 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 # 发布后仅重新打包：
 .\scripts\build-synology.ps1 -SkipPublish
 # 下一次版本升级必须递增最后的套件构建号：
-.\scripts\build-synology.ps1 -Version 0.2.0-27
+.\scripts\build-synology.ps1 -Version 0.2.0-28
 ```
 
 打包使用现有 WSL `Ubuntu-26.04` 的 Python 标准库；无需额外安装 SPK SDK。
@@ -174,15 +178,15 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 Linux / GitHub Actions 在发布 `linux-x64` 后可直接运行：
 
 ```sh
-python3 scripts/package-synology.py --version 0.2.0-27
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk
+python3 scripts/package-synology.py --version 0.2.0-28
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk
 ```
 
 生命周期及跨用户探测测试可在 Linux 运行；加 `--cross-user` 时用 root 启动测试，
 测试会在临时目录内分别以现有的 `nobody`、`daemon` 身份模拟两个套件，不创建系统账号：
 
 ```sh
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-27-dsm7.2-x86_64.spk --lifecycle --cross-user
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk --lifecycle --cross-user
 ```
 
 打包依据群晖官方 [套件格式](https://help.synology.com/developer-guide/synology_package/INFO.html)、

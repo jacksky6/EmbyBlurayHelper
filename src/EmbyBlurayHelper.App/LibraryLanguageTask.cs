@@ -253,7 +253,8 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         Update(() => plan.ServerId = serverId);
         var folders = await Read(config, "Library/VirtualFolders", token);
         if (folders.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("Emby 未返回媒体库列表，请检查管理权限。");
-        var groups = folders.EnumerateArray().Select(l => new LibraryGroup { Id = Text(l, "ItemId"), Name = Text(l, "Name") }).ToArray();
+        var groups = folders.EnumerateArray().Where(l => SettingsStore.LibraryTypeAllowed(Text(l, "CollectionType")))
+            .Select(l => new LibraryGroup { Id = Text(l, "ItemId"), Name = Text(l, "Name") }).ToArray();
         if (groups.Any(l => l.Id.Length == 0) || groups.Select(l => l.Id).Distinct().Count() != groups.Length)
             throw new InvalidOperationException("Emby 媒体库 ID 缺失或重复，无法建立可靠的分库计划。");
         groups = groups.Where(l => SettingsStore.LibraryAllowed(config, serverId, l.Id)).ToArray();
@@ -516,8 +517,8 @@ internal sealed class LibraryLanguageTask : IAsyncDisposable
         if (libraryIds.Any(id => !SettingsStore.LibraryAllowed(config, plan.ServerId, id)))
             throw new InvalidOperationException("所选媒体库已在全局设置中排除，请重新检查。");
         var folders = await Read(config, "Library/VirtualFolders", token);
-        if (folders.ValueKind != JsonValueKind.Array || libraryIds.Any(id => !folders.EnumerateArray().Any(l => Text(l, "ItemId") == id)))
-            throw new InvalidOperationException("所选媒体库已删除或无法访问，请重新检查媒体库。");
+        if (folders.ValueKind != JsonValueKind.Array || libraryIds.Any(id => !folders.EnumerateArray().Any(l => Text(l, "ItemId") == id && SettingsStore.LibraryTypeAllowed(Text(l, "CollectionType")))))
+            throw new InvalidOperationException("所选媒体库已删除、无法访问或属于系统合集，请重新检查媒体库。");
         var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var id in libraryIds)
         {

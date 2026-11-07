@@ -41,7 +41,10 @@ internal sealed class SettingsStore
         .Where(p => p.Value.Length > 0).OrderBy(p => p.Key, StringComparer.Ordinal)
         .Select(p => p.Key + ":" + string.Join(",", p.Value.OrderBy(id => id, StringComparer.Ordinal))));
     internal static string PlanConnection(HelperSettings config) => Connection(config) +
-        (ScopeStamp(config) is { Length: > 0 } scope ? "\nScope:" + scope : "");
+        (ScopeStamp(config) is { Length: > 0 } scope ? "\nScope:" + scope : "") + "\nLibraryFilter:no-boxsets-v1";
+    // Collections are a virtual entry point, not an independently scanned library.
+    // Version the catalog rule above so older saved plans must be checked again.
+    internal static bool LibraryTypeAllowed(string? type) => !string.Equals(type?.Trim(), "boxsets", StringComparison.OrdinalIgnoreCase);
     internal static bool LibraryAllowed(HelperSettings config, string serverId, string id) =>
         !config.ExcludedLibrariesByServer.TryGetValue(serverId, out var excluded) || !excluded.Contains(id, StringComparer.Ordinal);
     internal static string[] ExcludedPaths(HelperSettings config) => config.ScopeConnection == Connection(config) ? config.ScopeExcludedPaths : [];

@@ -333,6 +333,18 @@ try
         Check(scoped.GetProperty("libraries").GetArrayLength() == 2, "another server's exclusions do not hide this server's libraries");
         Check(scoped.GetProperty("items").EnumerateArray().Single(i => S(i,"id") == "902").GetProperty("verifiedAt").ValueKind == JsonValueKind.String,
             "excluding and restoring a library retains verification history for unchanged discs");
+        var preFilterPlan = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        var legacyConnection = SettingsStore.Connection(settings.Current) + (SettingsStore.ScopeStamp(settings.Current) is { Length: > 0 } stamp ? "\nScope:" + stamp : "");
+        preFilterPlan["connectionFingerprint"] = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(legacyConnection)));
+        await File.WriteAllTextAsync(path, preFilterPlan.ToJsonString());
+        var savedWrites = scopedBackend.Writes.Count;
+        await using var upgraded = new LibraryLanguageTask(settings, scopedClient, log);
+        Check(!State(upgraded).GetProperty("connectionMatches").GetBoolean() && State(upgraded).GetProperty("libraries").GetArrayLength() == 0,
+            "plans from before the collection filter are hidden until a new check");
+        upgraded.Scan(); var checkedAgain = await Idle(upgraded);
+        Check(S(checkedAgain,"status") == "ready" && checkedAgain.GetProperty("libraries").GetArrayLength() == 2 &&
+            checkedAgain.GetProperty("items").EnumerateArray().Single(i => S(i,"id") == "902").GetProperty("verifiedAt").ValueKind == JsonValueKind.String && scopedBackend.Writes.Count == savedWrites,
+            "upgrading the library filter preserves member movies and verification history without probing again");
     }
     Console.WriteLine($"Passed {count} library task checks.");
 }
@@ -417,7 +429,8 @@ sealed class MockEmby : HttpMessageHandler
         if(!request.Headers.TryGetValues("X-Emby-Token",out var keys) || keys.Single()!="private-fixture-key") return new(HttpStatusCode.Unauthorized);
         var path=request.RequestUri!.AbsolutePath;
         if(path.EndsWith("System/Info/Public"))return Json(new {Id=ServerId});
-        if(path.EndsWith("Library/VirtualFolders"))return Json(Memberships.Keys.Select(id=>new {ItemId=id,Name="Library "+id}).ToArray());
+        if(path.EndsWith("Library/VirtualFolders"))return Json(Memberships.Keys.Select(id=>new {ItemId=id,Name="Library "+id,CollectionType=""})
+            .Append(new {ItemId="collections",Name="合集",CollectionType="boxsets"}).ToArray());
         if(path.EndsWith("Encoding/FfmpegOptions"))return Json(new {Object=new {UseCustomProbePath=ProbeConnected,CustomProbePath=Environment.ProcessPath}});
         if(path.EndsWith("BlurayHelper/Status"))
         {

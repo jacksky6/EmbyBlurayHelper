@@ -160,7 +160,8 @@ sealed class FeatureBackend : HttpMessageHandler
         var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
         object response;
         if (path.EndsWith("System/Info/Public")) response = new { Id = Server };
-        else if (path.EndsWith("Library/VirtualFolders")) response = Groups.Keys.Select(id => new { ItemId = id, Name = "Library " + id }).ToArray();
+        else if (path.EndsWith("Library/VirtualFolders")) response = Groups.Keys.Select(id => new { ItemId = id, Name = "Library " + id, CollectionType = "" })
+            .Append(new { ItemId = "collections", Name = "合集", CollectionType = "boxsets" }).ToArray();
         else if (path.EndsWith("BlurayHelper/Status")) response = new { capabilities = Capable ? new[] { "media-features-verification" } : [] };
         else if (path.EndsWith("Encoding/FfmpegOptions")) response = new { Object = new { UseCustomProbePath = Connected, CustomProbePath = Environment.ProcessPath } };
         else if (path.EndsWith("Items"))
