@@ -76,10 +76,16 @@ def build(version, published, output):
             add(payload, "MEDIA-FEATURES.md", source(ROOT / "docs/MEDIA-FEATURES.md"))
             add(payload, "NATIVE-CHAPTERS.md", source(ROOT / "docs/NATIVE-CHAPTERS.md"))
             add(payload, "DISC-THUMBNAILS.md", source(ROOT / "docs/DISC-THUMBNAILS.md"))
+            add(payload, "INFUSE-DOLBY-VISION.md", source(ROOT / "docs/INFUSE-DOLBY-VISION.md"))
+            add(payload, "tools/README.md", source(ROOT / "packaging/native/README.md"))
+            for native in (published / "tools").glob("*"):
+                if native.is_file() and native.name in ("libdovi.so", "libdovi-MIT.txt"):
+                    add(payload, f"tools/{native.name}", native.read_bytes(), 0o755 if native.suffix == ".so" else 0o644)
             add(payload, "ARCHITECTURE.md", source(ROOT / "docs/ARCHITECTURE.md"))
             add(payload, "emby-plugin/EmbyBlurayHelper.Plugin.dll", (ROOT / "artifacts/plugin/EmbyBlurayHelper.Plugin.dll").read_bytes())
             add(payload, "licenses/BDInfo-LGPL-2.1.txt", source(ROOT / "THIRD-PARTY-LICENSES/BDInfo-LGPL-2.1.txt"))
             add(payload, "licenses/DiscUtils-MIT.txt", source(ROOT / "THIRD-PARTY-LICENSES/DiscUtils-MIT.txt"))
+            add(payload, "licenses/libdovi-MIT.txt", source(ROOT / "THIRD-PARTY-LICENSES/libdovi-MIT.txt"))
             for path in sorted((TEMPLATE / "ui").rglob("*")):
                 if path.is_file():
                     add(payload, path.relative_to(TEMPLATE).as_posix(), source(path))

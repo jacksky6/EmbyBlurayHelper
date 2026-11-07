@@ -7,6 +7,7 @@ using EmbyBlurayHelper;
 using EmbyBlurayHelper.App;
 using EmbyBlurayHelper.ProbeWrapper;
 using EmbyBlurayHelper.Proxy;
+using EmbyBlurayHelper.Proxy.DolbyVision;
 using EmbyBlurayHelper.ProbeWrapper.MediaFeatures;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -163,6 +164,8 @@ if (settings.Current.EmbyApiKey.Length > 0 && settings.Current.ExcludedLibraries
 app.UseWebSockets();
 var proxies = new Dictionary<ProxyConfiguration, EmbyProxy>();
 var proxyGate = new object();
+var dvRuntime = new DvRuntime(DvOptions.From(settings.ProxyConfiguration()), app.Services.GetRequiredService<ILogger<EmbyProxy>>());
+app.Lifetime.ApplicationStopping.Register(() => { lock (proxyGate) dvRuntime.Dispose(); });
 // One persisted record shared by every proxy instance; it outlives settings changes.
 var discListings = new EmbyBlurayHelper.Proxy.Chapters.DiscListingStore(Path.Combine(settings.DataDirectory, "infuse-disc-listings.json"), app.Services.GetRequiredService<ILogger<EmbyProxy>>());
 var managementPort = new Uri(settings.Startup.ManagementUrl).Port;
@@ -179,7 +182,7 @@ app.Use(async (context, next) =>
             if (!proxies.TryGetValue(config, out proxy!))
             {
                 proxies.Clear();
-                proxy = new EmbyProxy(config, mediaClient, app.Services.GetRequiredService<IMemoryCache>(), app.Services.GetRequiredService<ILogger<EmbyProxy>>(), discListings: discListings);
+                proxy = new EmbyProxy(config, mediaClient, app.Services.GetRequiredService<IMemoryCache>(), app.Services.GetRequiredService<ILogger<EmbyProxy>>(), discListings: discListings, dvRuntime: dvRuntime);
                 proxies[config] = proxy;
             }
         }
@@ -218,7 +221,7 @@ app.Use(async (context, next) =>
 });
 
 foreach (var (route, name, type) in new[] { ("/", "index.html", "text/html; charset=utf-8"), ("/app.css", "app.css", "text/css"), ("/app.js", "app.js", "text/javascript"), ("/library.js", "library.js", "text/javascript"), ("/chapters.js", "chapters.js", "text/javascript"),
-    ("/emby-icon.png", "emby-icon.png", "image/png"), ("/infuse-icon.jpg", "infuse-icon.jpg", "image/jpeg") })
+    ("/dolby-vision.js", "dolby-vision.js", "text/javascript"), ("/dolby-vision.css", "dolby-vision.css", "text/css"), ("/emby-icon.png", "emby-icon.png", "image/png"), ("/infuse-icon.jpg", "infuse-icon.jpg", "image/jpeg") })
     app.MapGet(route, () => Results.Stream(Assembly.GetExecutingAssembly().GetManifestResourceStream("EmbyBlurayHelper.App.Web." + name)!, type));
 // Public distribution of one embedded, non-secret DLL. All installation happens in Emby as an administrator action.
 var pluginUpdate = new Lazy<BundledPluginUpdate>(() => new BundledPluginUpdate());
@@ -254,8 +257,19 @@ app.MapGet("/api/settings", () => new { settings = settings.Current, hasApiKey =
 app.MapPost("/api/settings", async (HelperSettings input, CancellationToken token) =>
 {
     SettingsStore.Validate(input);
+    if (input.EnableInfuseDolbyVision && (!settings.Current.EnableInfuseDolbyVision ||
+        SettingsStore.DvFfmpeg(input) != SettingsStore.DvFfmpeg(settings.Current) || SettingsStore.DvLibrary(input) != SettingsStore.DvLibrary(settings.Current)))
+        await DvDependencies.Check(new(true, SettingsStore.DvFfmpeg(input), SettingsStore.DvLibrary(input), input.DolbyVisionCacheMiB, input.DolbyVisionGlobalCacheMiB), token);
     var connectionChanged = SettingsStore.Connection(input) != SettingsStore.Connection(settings.Current);
     await integration.SaveSettings(input, token);
+    lock (proxyGate)
+    {
+        var options = DvOptions.From(settings.ProxyConfiguration());
+        if (connectionChanged || options != dvRuntime.Options)
+        {
+            dvRuntime.Dispose(); dvRuntime = new DvRuntime(options, app.Services.GetRequiredService<ILogger<EmbyProxy>>()); proxies.Clear();
+        }
+    }
     if (connectionChanged && settings.Current.ExcludedLibrariesByServer.Count > 0)
     {
         try { await libraryScope.Prepare(token); }
@@ -281,6 +295,19 @@ app.MapPost("/api/detect", () => EmbyIntegration.Detect());
 app.MapPost("/api/emby/test", (CancellationToken token) => integration.Test(token));
 app.MapGet("/api/probe/status", (CancellationToken token) => integration.GetProbeStatus(token));
 app.MapGet("/api/infuse/multiclip", () => integration.GetMultiClipStatus());
+app.MapGet("/api/infuse/dolby-vision", () =>
+{
+    var options = DvOptions.From(settings.ProxyConfiguration());
+    return new { enabled = options.Enabled, available = dvRuntime.Available, ffmpegPath = options.Ffmpeg, libraryPath = options.Library,
+        sessionCacheMiB = options.SessionMiB, globalCacheMiB = options.GlobalMiB, cache = dvRuntime.Cache.Status() };
+});
+app.MapPost("/api/infuse/dolby-vision/check", async (CancellationToken token) =>
+{
+    var options = DvOptions.From(settings.ProxyConfiguration()); var version = await DvDependencies.Check(options, token);
+    lock (proxyGate) if (!dvRuntime.Available || dvRuntime.Options != options)
+    { dvRuntime.Dispose(); dvRuntime = new DvRuntime(options, app.Services.GetRequiredService<ILogger<EmbyProxy>>()); proxies.Clear(); }
+    return new { version };
+});
 // Read-only: from the persisted listing record; never reads media files.
 app.MapGet("/api/infuse/chapters", () => { var (available, unavailable) = discListings.Summary();
     return new { enabled = settings.Current.EnableInfuseChapters, available, unavailable = unavailable.Select(u => new { itemId = u.ItemId, name = u.Name, reason = u.Reason }) }; });

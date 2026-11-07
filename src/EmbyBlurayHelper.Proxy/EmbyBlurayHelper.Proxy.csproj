@@ -9,5 +9,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BDInfo" Version="0.8.0" />
+    <PackageReference Include="DiscUtils.Udf" Version="0.16.13" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs" Link="Disc/IsoDiscMetadata.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs" Link="Disc/IsoMediaHttpSource.cs" />
+    <Compile Include="../EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs" Link="Disc/BluRayLanguageAugmenter.cs" />
   </ItemGroup>
 </Project>

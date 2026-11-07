@@ -28,6 +28,8 @@ jobs:
           dotnet-version: 8.0.x
       - name: Verify transport language patching
         run: dotnet run --project tests/EmbyBlurayHelper.Proxy.Tests -c Release
+      - name: Verify Dolby Vision range, cache and cancellation invariants
+        run: dotnet run --project tests/EmbyBlurayHelper.DolbyVision.Tests -c Release
       - name: Verify library language tasks
         run: dotnet run --project tests/EmbyBlurayHelper.Library.Tests -c Release
       - name: Verify global library processing scope
@@ -55,6 +57,7 @@ jobs:
           node tests/web/library-scope.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
           node tests/web/native-chapters.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
           node tests/web/plugin-update.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
+          node tests/web/dolby-vision.test.cjs "$RUNNER_TEMP/helper-ui/node_modules/jsdom"
       - name: Publish unified Web console
         run: >-
           dotnet publish src/EmbyBlurayHelper.App -c Release
@@ -67,6 +70,10 @@ jobs:
           chmod +x artifacts/app/linux-x64/EmbyBlurayHelper
           dotnet run --project tests/EmbyBlurayHelper.App.Tests -c Release -- artifacts/app/linux-x64/EmbyBlurayHelper
           dotnet run --project tests/EmbyBlurayHelper.Scope.Tests -c Release -- artifacts/app/linux-x64/EmbyBlurayHelper
+      - name: Stage verified Windows libdovi
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: ./scripts/stage-dovi-windows.ps1 -Destination artifacts/app/win-x64
       - name: Package unified Web console
         run: sh scripts/package-portable.sh ${{ matrix.rid }}
       - name: Package DSM 7.2 x86_64

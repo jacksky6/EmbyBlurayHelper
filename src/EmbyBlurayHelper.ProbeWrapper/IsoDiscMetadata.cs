@@ -114,7 +114,7 @@ internal sealed class IsoDiscMetadata : IDisposable
         return selected;
     }
 
-    internal (TSPlaylistFile Playlist, string Match) SelectChapterPlaylist(CancellationToken token, long runtimeTicks, long sourceSize, bool iso)
+    internal (TSPlaylistFile Playlist, string Match) SelectChapterPlaylist(CancellationToken token, long runtimeTicks, long sourceSize, bool iso, bool requireEquivalentClips = false)
     {
         var longest = SelectPlaylist(token);
         if (runtimeTicks <= 0) return (longest, "longest-complete-playlist");
@@ -129,6 +129,14 @@ internal sealed class IsoDiscMetadata : IDisposable
         var first = Marks(matches[0]);
         if (matches.Skip(1).Any(p => { var other = Marks(p); return first.Length != other.Length || first.Zip(other).Any(t => Math.Abs(t.First - t.Second) > .05); }))
             throw new InvalidDataException("存在多个匹配版本且章节时间不同，无法可靠确定正片；保留原章节。");
+        if (requireEquivalentClips)
+        {
+            // Chapters alone are enough for chapter extraction, but not for
+            // streaming: equal-length branches can contain different pictures.
+            var clips = matches[0].StreamClips.Select(c => (c.Name.ToUpperInvariant(), c.TimeIn, c.TimeOut, c.AngleIndex)).ToArray();
+            if (matches.Skip(1).Any(p => !clips.SequenceEqual(p.StreamClips.Select(c => (c.Name.ToUpperInvariant(), c.TimeIn, c.TimeOut, c.AngleIndex)))))
+                throw new InvalidDataException("Multiple matching Blu-ray playlists contain different clip sequences; original playback retained.");
+        }
         var selected = matches.OrderBy(p => Math.Abs(p.TotalLength - seconds)).ThenBy(p => p.Name, StringComparer.Ordinal).First();
         var reason = exact.Length > 0 ? "exact-clip-size-and-runtime" : "runtime-and-equivalent-chapters";
         Console.Error.WriteLine($"NativeChapters: selected {selected.Name}, {reason}, {selected.TotalLength:F3}s; Emby {seconds:F3}s.");

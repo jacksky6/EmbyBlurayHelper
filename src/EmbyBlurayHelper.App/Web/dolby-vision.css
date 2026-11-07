@@ -1,0 +1,4 @@
+#dolby-vision-panel .notice.warning{margin:18px 0;background:#fff9ee;border:1px solid #f0dfbd;color:#8b693d;line-height:1.9}
+#dolby-vision-panel .multiclip-help label{display:block;margin-top:18px}
+#dolby-vision-panel select{display:block;width:100%;max-width:360px;min-height:42px;padding:9px 12px;border:1px solid #e2e4ef;border-radius:9px;background:#fafbff;color:#59617b;font:inherit}
+#dolby-vision-panel .field-help{overflow-wrap:anywhere}

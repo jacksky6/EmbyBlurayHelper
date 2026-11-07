@@ -14,6 +14,11 @@ internal sealed record HelperSettings
     public bool EnableInfuseLanguagePatch { get; init; } = true;
     public bool EnableInfuseMultiClipPlayback { get; init; }
     public bool EnableInfuseChapters { get; init; }
+    public bool EnableInfuseDolbyVision { get; init; }
+    public string DolbyVisionFfmpegPath { get; init; } = "";
+    public string DolbyVisionLibraryPath { get; init; } = "";
+    public int DolbyVisionCacheMiB { get; init; } = 512;
+    public int DolbyVisionGlobalCacheMiB { get; init; } = 1024;
     public bool EnableMediaFeatures { get; init; }
     public bool EnableNativeChapters { get; init; }
     public string FeatureProbePath { get; init; } = "";
@@ -82,8 +87,18 @@ internal sealed class SettingsStore
         UpstreamBaseUrl = Current.EmbyUrl,
         EnableInfuseLanguagePatch = Current.EnableInfuseLanguagePatch,
         EnableInfuseMultiClipPlayback = Current.EnableInfuseMultiClipPlayback,
-        EnableInfuseChapters = Current.EnableInfuseChapters
+        EnableInfuseChapters = Current.EnableInfuseChapters,
+        EnableInfuseDolbyVision = Current.EnableInfuseDolbyVision,
+        DolbyVisionFfmpegPath = DvFfmpeg(Current),
+        DolbyVisionLibraryPath = DvLibrary(Current),
+        DolbyVisionCacheMiB = Current.DolbyVisionCacheMiB,
+        DolbyVisionGlobalCacheMiB = Current.DolbyVisionGlobalCacheMiB
     };
+
+    internal static string DvFfmpeg(HelperSettings settings) => settings.DolbyVisionFfmpegPath.Length > 0 ? settings.DolbyVisionFfmpegPath :
+        settings.UpstreamProbePath.Length > 0 ? Path.Combine(Path.GetDirectoryName(settings.UpstreamProbePath)!, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg") : "";
+    internal static string DvLibrary(HelperSettings settings) => settings.DolbyVisionLibraryPath.Length > 0 ? settings.DolbyVisionLibraryPath :
+        Path.Combine(AppContext.BaseDirectory, "tools", OperatingSystem.IsWindows() ? "dovi.dll" : OperatingSystem.IsMacOS() ? "libdovi.dylib" : "libdovi.so");
 
     public bool RestartRequired => Current.ManagementUrl != Startup.ManagementUrl || Current.ProxyUrl != Startup.ProxyUrl;
 
@@ -91,6 +106,11 @@ internal sealed class SettingsStore
     {
         if (settings.EmbyApiKey is null || settings.UpstreamProbePath is null || settings.FeatureProbePath is null)
             throw new ArgumentException("API key 和探测器路径不能为 null；未配置时请留空。");
+        if (settings.DolbyVisionFfmpegPath is null || settings.DolbyVisionLibraryPath is null ||
+            new[] { settings.DolbyVisionFfmpegPath, settings.DolbyVisionLibraryPath }.Any(p => p.Length > 0 && !Path.IsPathFullyQualified(p)))
+            throw new ArgumentException("杜比视界工具路径必须留空或使用完整路径。");
+        if (settings.DolbyVisionCacheMiB is < 128 or > 4096 || settings.DolbyVisionGlobalCacheMiB < settings.DolbyVisionCacheMiB || settings.DolbyVisionGlobalCacheMiB > 16384)
+            throw new ArgumentException("杜比视界单会话缓存需为 128–4096 MiB，总缓存不得小于单会话缓存且最多 16384 MiB。");
         if (settings.ExcludedLibrariesByServer is null || settings.ScopeExcludedPaths is null ||
             settings.ExcludedLibrariesByServer.Any(p => string.IsNullOrWhiteSpace(p.Key) || p.Value is null || p.Value.Any(string.IsNullOrWhiteSpace)) ||
             settings.ScopeExcludedPaths.Any(string.IsNullOrWhiteSpace))

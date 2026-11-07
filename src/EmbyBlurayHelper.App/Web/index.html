@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f6f7fb"><title>EmbyBlurayHelper</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%235759df'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='32' cy='32' r='5' fill='white'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script><script src="/library-scope.js" defer></script><script src="/library.js" defer></script><script src="/chapters.js" defer></script>
+  <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/dolby-vision.css"><script src="/app.js" defer></script><script src="/library-scope.js" defer></script><script src="/library.js" defer></script><script src="/chapters.js" defer></script><script src="/dolby-vision.js" defer></script>
 </head>
 <body>
 <svg class="icon-library" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -174,6 +174,21 @@
     <div class="panel settings-panel"><div class="toggle-row"><span class="feature-icon mint"><svg><use href="#activity"/></svg></span><div class="toggle-copy"><h2>Infuse UHD 语言补写</h2><p>Infuse 静态播放 4K 蓝光原盘时，补写 PMT 中缺失的音轨和字幕语言标签。</p></div><label class="switch"><input id="enable-infuse" type="checkbox" role="switch" aria-label="启用 Infuse UHD 语言补写"><span></span></label></div>
      <div class="status-box" id="infuse-language-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong id="infuse-language-title">已关闭</strong><p id="infuse-language-copy">开启后，Infuse 播放 UHD 原盘时按原盘语言补写音轨和字幕标签。</p></div></div>
      <div class="info-strip"><span><svg><use href="#check"/></svg>保留音视频内容</span><span><svg><use href="#check"/></svg>原盘只读</span><span><svg><use href="#check"/></svg>按需内存处理</span></div></div>
+   <div class="panel settings-panel spaced" id="dolby-vision-panel">
+    <div class="toggle-row"><span class="feature-icon lavender"><svg><use href="#activity"/></svg></span><div class="toggle-copy"><h2>Infuse 杜比视界兼容 <span class="new-feature">实验功能</span></h2><p>播放 UHD 蓝光原盘时，按需把 Dolby Vision Profile 7 转换为兼容 Apple TV 的 Profile 8.1。</p></div><label class="switch"><input id="enable-dolby-vision" type="checkbox" role="switch" aria-label="启用 Infuse 杜比视界兼容"><span></span></label></div>
+    <div class="status-box" id="dolby-vision-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong>已关闭</strong><p>默认关闭。仅处理经过播放代理的 Infuse，其他客户端按原方式播放。</p></div></div>
+    <div class="notice warning">FEL 原盘转换会舍弃增强层的画面残差。保留基础层压缩画面，转换动态元数据，不重新编码视频或音频；转换结果不等同于完整 FEL 画质。</div>
+    <div class="info-strip"><span><svg><use href="#check"/></svg>仅 Infuse · BDMV / ISO</span><span><svg><use href="#check"/></svg>按需内存封装</span><span><svg><use href="#check"/></svg>保留原文件</span></div>
+    <details class="multiclip-help"><summary>缓存与工具设置</summary><div>
+     <label for="dv-session-cache">单会话片段缓存上限</label><select id="dv-session-cache"><option value="256">256 MiB</option><option value="512" selected>512 MiB（默认）</option><option value="1024">1 GiB</option><option value="2048">2 GiB</option></select>
+     <label for="dv-global-cache">全部会话缓存上限</label><select id="dv-global-cache"><option value="512">512 MiB</option><option value="1024" selected>1 GiB（默认）</option><option value="2048">2 GiB</option><option value="4096">4 GiB</option></select>
+     <p class="field-help">按需填充，起播不等待缓存填满。缓存中保留近期已转换片段，空闲约 2 分钟释放。上限只计算媒体片段；封装工具、转换工作区、索引及系统文件缓存另占内存。80 GB / 2 小时的原盘平均约 89 Mb/s，512 MiB 约对应 48 秒，峰值时更短。</p>
+     <label for="dv-ffmpeg-path">封装用 FFmpeg（可留空自动选择）</label><input id="dv-ffmpeg-path" autocomplete="off" placeholder="默认使用 Emby 原版 ffprobe 同目录的 ffmpeg"><p class="field-help" id="dv-effective-ffmpeg"></p>
+     <label for="dv-library-path">libdovi 原生库（可留空）</label><input id="dv-library-path" autocomplete="off" placeholder="默认使用本工具 tools 目录的对应平台原生库"><p class="field-help" id="dv-effective-library"></p>
+     <div class="form-actions"><button id="dv-save" class="button primary">保存设置</button><button id="dv-check" class="button secondary">检查工具</button></div>
+    </div></details>
+    <details class="multiclip-help"><summary>处理范围与工作方式</summary><div><p>开启后，已识别为 P7 的 UHD BDMV 和蓝光 ISO 会自动以带索引的虚拟 MKV 提供给 Infuse。只转换当前请求所需的片段，支持 HTTP Range；不预先生成整片文件，不写临时视频。保留音轨、字幕语言及 Emby 已保存的章节；无需再单独开启语言或章节开关。</p><p>需要本工具能读取原盘，Emby 已补齐时长和杜比视界规格，并且封装用 FFmpeg、对应平台 libdovi 可运行。暂限单角度、单时钟域的完整片段；裁剪分支、复杂时钟域或无法匹配的播放列表保留原方式并记录原因。若实际码流或封装在播放中校验失败，会记录错误并停止该流，不把原盘数据冒充 MKV。</p><p>开启或关闭后，请在 Infuse 中强制退出再打开并重新同步媒体库。直接连接 Emby 8096、其他客户端、普通 MKV 和 HDR10 原盘不处理。当前正在进行 Apple TV 的整片、跳转和续播验证。</p></div></details>
+   </div>
    <div class="panel settings-panel spaced" id="infuse-chapters-panel">
     <div class="toggle-row"><span class="feature-icon mint"><svg><use href="#disc"/></svg></span><div class="toggle-copy"><h2>Infuse 原盘章节 <span class="new-feature">实验功能</span></h2><p>Emby 已有章节时，为 BDMV 提供包含这些章节的虚拟 ISO，供 Infuse 从原盘导航中读取。</p></div><label class="switch"><input id="enable-infuse-chapters" type="checkbox" role="switch" aria-label="启用 Infuse 原盘章节"><span></span></label></div>
     <div class="status-box" id="infuse-chapters-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong id="infuse-chapters-state" class="off">已关闭</strong><p id="infuse-chapters-copy">默认关闭。开启后，带 Emby 章节的 BDMV 在 Infuse 中以虚拟 ISO 呈现。</p></div></div>

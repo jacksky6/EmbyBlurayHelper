@@ -9,6 +9,11 @@ internal sealed record ProxyConfiguration
     public bool EnableInfuseLanguagePatch { get; init; } = true;
     public bool EnableInfuseMultiClipPlayback { get; init; }
     public bool EnableInfuseChapters { get; init; }
+    public bool EnableInfuseDolbyVision { get; init; }
+    public string DolbyVisionFfmpegPath { get; init; } = "";
+    public string DolbyVisionLibraryPath { get; init; } = "";
+    public int DolbyVisionCacheMiB { get; init; } = 512;
+    public int DolbyVisionGlobalCacheMiB { get; init; } = 1024;
 
     public static ProxyConfiguration Load(string path)
     {

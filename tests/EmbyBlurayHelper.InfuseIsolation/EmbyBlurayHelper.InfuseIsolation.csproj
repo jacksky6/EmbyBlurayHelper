@@ -8,6 +8,10 @@
   <ItemGroup>
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/EmbyProxy.cs" Link="Proxy/EmbyProxy.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/Chapters/*.cs" Link="Proxy/Chapters/%(Filename)%(Extension)" />
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/DolbyVision/*.cs" Link="Proxy/DolbyVision/%(Filename)%(Extension)" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs" Link="Disc/IsoDiscMetadata.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs" Link="Disc/IsoMediaHttpSource.cs" />
+    <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs" Link="Disc/BluRayLanguageAugmenter.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/EmbyToolProcess.cs" Link="Proxy/EmbyToolProcess.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/WholeClipPlaylist.cs" Link="Proxy/WholeClipPlaylist.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/ProxyConfiguration.cs" Link="Proxy/ProxyConfiguration.cs" />

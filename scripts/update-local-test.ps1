@@ -33,7 +33,7 @@ if (([Uri]$config.managementUrl).Port -ne 8099 -or ([Uri]$config.proxyUrl).Port 
     throw 'Expected the main Helper ports 8099 and 8097. No configuration was changed.'
 }
 $headers = @{ 'X-Emby-Token' = $config.embyApiKey }
-if ($HelperOnly -and (Get-FileHash -LiteralPath $pluginSource).Hash -ne (Get-FileHash -LiteralPath $pluginTarget).Hash) {
+if ($HelperOnly -and (Get-Item -LiteralPath $pluginSource).VersionInfo.FileVersion -ne (Get-Item -LiteralPath $pluginTarget).VersionInfo.FileVersion) {
     throw 'The plugin also needs updating. Omit -HelperOnly to perform the full update.'
 }
 
@@ -68,6 +68,8 @@ $backup = Join-Path $projectRoot ('artifacts\checks\local-update-' + (Get-Date -
 $null = New-Item -ItemType Directory -Path $backup
 Write-Output "Backup: $backup"
 $replacing = $false
+$toolsCopied = @()
+$toolNames = @('dovi.dll', 'libdovi-MIT.txt')
 try {
     $embyProcesses = @()
     if (-not $HelperOnly) { $embyProcesses = @(Find-ExactProcess $embyExe) }
@@ -88,6 +90,13 @@ try {
     if (Test-Path -LiteralPath $oldPdb) { Copy-Item -LiteralPath $oldPdb -Destination $backup }
     Copy-Item -LiteralPath $pluginTarget -Destination (Join-Path $backup 'EmbyBlurayHelper.Plugin.dll')
     Copy-Item -LiteralPath (Join-Path $live 'data') -Destination (Join-Path $backup 'helper-data') -Recurse
+    foreach ($name in $toolNames) {
+        $existing = Join-Path $live ('tools/' + $name)
+        if (Test-Path -LiteralPath $existing) {
+            $null = New-Item -ItemType Directory -Path (Join-Path $backup 'tools') -Force
+            Copy-Item -LiteralPath $existing -Destination (Join-Path $backup ('tools/' + $name))
+        }
+    }
     if (-not $HelperOnly) {
         $databaseBackup = Join-Path $backup 'emby-database'
         $null = New-Item -ItemType Directory -Path $databaseBackup
@@ -97,6 +106,14 @@ try {
 
     $replacing = $true
     Copy-Item -LiteralPath (Join-Path $staged 'EmbyBlurayHelper.exe') -Destination $helperExe -Force
+    foreach ($name in $toolNames) {
+        $newTool = Join-Path $staged ('tools/' + $name)
+        if (Test-Path -LiteralPath $newTool) {
+            $null = New-Item -ItemType Directory -Path (Join-Path $live 'tools') -Force
+            $toolsCopied += $name
+            Copy-Item -LiteralPath $newTool -Destination (Join-Path $live ('tools/' + $name)) -Force
+        }
+    }
     $newPdb = Join-Path $staged 'EmbyBlurayHelper.pdb'
     if (Test-Path -LiteralPath $newPdb) { Copy-Item -LiteralPath $newPdb -Destination $live -Force }
     if (-not $HelperOnly) { Copy-Item -LiteralPath $pluginSource -Destination $pluginTarget -Force }
@@ -107,6 +124,12 @@ try {
         if (-not $HelperOnly) { Copy-Item -LiteralPath (Join-Path $backup 'EmbyBlurayHelper.Plugin.dll') -Destination $pluginTarget -Force }
         $savedPdb = Join-Path $backup 'EmbyBlurayHelper.pdb'
         if (Test-Path -LiteralPath $savedPdb) { Copy-Item -LiteralPath $savedPdb -Destination $live -Force }
+        foreach ($name in $toolsCopied) {
+            $oldTool = Join-Path $backup ('tools/' + $name)
+            $liveTool = Join-Path $live ('tools/' + $name)
+            if (Test-Path -LiteralPath $oldTool) { Copy-Item -LiteralPath $oldTool -Destination $liveTool -Force }
+            else { Remove-Item -LiteralPath $liveTool }
+        }
         Write-Warning 'Replacement failed. Previous binaries were restored.'
     }
     throw

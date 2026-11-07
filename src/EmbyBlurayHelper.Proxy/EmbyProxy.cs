@@ -6,13 +6,15 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using EmbyBlurayHelper.Proxy.Chapters;
+using EmbyBlurayHelper.Proxy.DolbyVision;
 
 namespace EmbyBlurayHelper.Proxy;
 
 internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IMemoryCache cache, ILogger<EmbyProxy> logger,
-    Func<JsonElement, DiscChapterPresentation?>? chapterPresentationFactory = null, DiscListingStore? discListings = null)
+    Func<JsonElement, DiscChapterPresentation?>? chapterPresentationFactory = null, DiscListingStore? discListings = null, DvRuntime? dvRuntime = null)
 {
     private readonly InfuseChapterProxy chapterProxy = new(config, client, cache, logger, chapterPresentationFactory, discListings);
+    private readonly InfuseDolbyVisionProxy dolbyProxy = new(config, client, dvRuntime ?? new DvRuntime(DvOptions.From(config), logger), logger);
     private static readonly Regex StreamPath = new("^(?:/emby)?/videos/(?<id>[^/]+)/stream(?:\\.[a-z0-9]+)?/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly HashSet<string> HopByHop = new(StringComparer.OrdinalIgnoreCase)
     { "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Host" };
@@ -22,6 +24,8 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
         if (context.WebSockets.IsWebSocketRequest) { await ProxyWebSocketAsync(context); return; }
         var path = context.Request.Path.Value ?? "/";
         var match = StreamPath.Match(path);
+        if (match.Success && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) &&
+            await dolbyProxy.TryStreamAsync(context, match.Groups["id"].Value)) return;
         if (match.Success && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) &&
             await chapterProxy.TryStreamAsync(context, match.Groups["id"].Value)) return;
         if ((config.EnableInfuseLanguagePatch || config.EnableInfuseMultiClipPlayback) && match.Success && IsInfuse(context.Request) &&
@@ -37,15 +41,17 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
         }
         using var request = CreateRequest(context, Target(context), context.Request.Method, true);
         var chapterMetadata = chapterProxy.IsMetadata(context);
-        if (chapterMetadata) { request.Headers.AcceptEncoding.Clear(); request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity")); }
+        var dolbyMetadata = dolbyProxy.IsMetadata(context);
+        if (chapterMetadata || dolbyMetadata) { request.Headers.AcceptEncoding.Clear(); request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity")); }
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
         CopyHeaders(response, context.Response);
-        if (chapterMetadata && response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == "application/json" && !HttpMethods.IsHead(context.Request.Method))
+        if ((chapterMetadata || dolbyMetadata) && response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == "application/json" && !HttpMethods.IsHead(context.Request.Method))
         {
             var original = await response.Content.ReadAsByteArrayAsync(context.RequestAborted);
-            var changed = await chapterProxy.RewriteMetadataAsync(context, original);
-            var output = changed ?? original;
-            if (changed is not null) { context.Response.Headers.Remove("ETag"); context.Response.Headers.Remove("Content-Encoding"); context.Response.Headers.Remove("Content-MD5"); context.Response.Headers.CacheControl = "no-store"; }
+            var changed = dolbyMetadata ? await dolbyProxy.RewriteMetadataAsync(context, original) : null;
+            var chapterChanged = chapterMetadata ? await chapterProxy.RewriteMetadataAsync(context, changed ?? original) : null;
+            var output = chapterChanged ?? changed ?? original;
+            if (changed is not null || chapterChanged is not null) { context.Response.Headers.Remove("ETag"); context.Response.Headers.Remove("Content-Encoding"); context.Response.Headers.Remove("Content-MD5"); context.Response.Headers.CacheControl = "no-store"; }
             context.Response.ContentLength = output.Length;
             await context.Response.Body.WriteAsync(output, context.RequestAborted);
             return;
