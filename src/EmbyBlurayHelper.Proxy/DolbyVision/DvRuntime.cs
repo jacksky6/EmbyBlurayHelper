@@ -5,10 +5,10 @@ using System.Text.Json;
 
 namespace EmbyBlurayHelper.Proxy.DolbyVision;
 
-internal sealed record DvOptions(bool Enabled, string Ffmpeg, string Library, int SessionMiB, int GlobalMiB)
+internal sealed record DvOptions(bool Enabled, string Ffmpeg, string Library, int SessionMiB, int GlobalMiB, string DiscContainer = "iso")
 {
     internal static DvOptions From(ProxyConfiguration config) => new(config.EnableInfuseDolbyVision, config.DolbyVisionFfmpegPath,
-        config.DolbyVisionLibraryPath, config.DolbyVisionCacheMiB, config.DolbyVisionGlobalCacheMiB);
+        config.DolbyVisionLibraryPath, config.DolbyVisionCacheMiB, config.DolbyVisionGlobalCacheMiB, config.InfuseDiscContainer);
     internal bool Available => File.Exists(Ffmpeg) && File.Exists(Library);
 }
 
@@ -37,6 +37,7 @@ internal sealed class DvRuntime : IDisposable
     internal DvSessionCache Cache { get; }
     internal DvOptions Options { get; }
     internal bool Available { get; }
+    internal bool RemuxAvailable => File.Exists(Options.Ffmpeg);
     private readonly DvFragmentBuilder builder;
     private readonly ILogger logger;
     private readonly string engineStamp;
@@ -53,16 +54,16 @@ internal sealed class DvRuntime : IDisposable
         Cache = new(options.SessionMiB * 1048576L, options.GlobalMiB * 1048576L);
         cleanup = new Timer(_ => { Cache.Trim(); TrimPlans(); builder.Trim(); }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
-    internal async Task<Presentation> Describe(JsonElement source, CancellationToken token)
+    internal async Task<Presentation> Describe(JsonElement source, CancellationToken token, bool convertDolbyVision = true)
     {
-        if (!Available) throw new InvalidOperationException("DV dependencies are not configured or cannot be loaded.");
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source.GetRawText())));
+        if (convertDolbyVision ? !Available : !RemuxAvailable) throw new InvalidOperationException("Matroska dependencies are not configured or cannot be loaded.");
+        var key = (convertDolbyVision ? "dv:" : "remux:") + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source.GetRawText())));
         if (plans.TryGetValue(key, out var hit) && hit.Plan.IsCurrent) { hit.Access = DateTime.UtcNow; return hit; }
         await planGate.WaitAsync(token);
         try
         {
             if (plans.TryGetValue(key, out hit) && hit.Plan.IsCurrent) { hit.Access = DateTime.UtcNow; return hit; }
-            var plan = await Task.Run(() => DvDiscPlan.Create(source, token, engineStamp), token);
+            var plan = await Task.Run(() => DvDiscPlan.Create(source, token, engineStamp, convertDolbyVision), token);
             hit = new(plan); plans[key] = hit; TrimPlans(); return hit;
         }
         finally { planGate.Release(); }
@@ -77,8 +78,8 @@ internal sealed class DvRuntime : IDisposable
         return await Cache.Get(session, plan.Signature + ":" + index, segment.SlotBytes, async cancel =>
         {
             var result = await builder.Build(plan, segment, cancel); presentation.Verify(result);
-            logger.LogInformation("Infuse DV P7→P8.1: playlist {Playlist}; segment {Segment}/{Total}; at {Time} ms; {Frames} pictures; {Bytes} output bytes; {Input} input bytes; {Elapsed} ms; copy video/audio; EL residual discarded.",
-                plan.Playlist, index + 1, plan.Segments.Count, segment.ApproxStartMs, result.Pictures, result.Cluster.Length, result.InputBytes, result.ElapsedMs);
+            logger.LogInformation("Infuse MKV: {Mode}; playlist {Playlist}; segment {Segment}/{Total}; at {Time} ms; {Frames} converted pictures; {Bytes} output bytes; {Input} input bytes; {Elapsed} ms; copy video/audio.",
+                plan.ConvertDolbyVision ? "P7→P8.1; EL residual discarded" : "Remux; original video preserved", plan.Playlist, index + 1, plan.Segments.Count, segment.ApproxStartMs, result.Pictures, result.Cluster.Length, result.InputBytes, result.ElapsedMs);
             return result;
         }, token);
     }

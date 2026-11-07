@@ -6,6 +6,11 @@
   function render() {
     const enabled = !!configuration?.enableInfuseDolbyVision;
     if (!busy) $('#enable-dolby-vision').checked = enabled;
+    if (!busy) $('#infuse-disc-container').value = configuration?.infuseDiscContainer || 'iso';
+    $('#infuse-disc-container').disabled = busy || settingsSaving;
+    const mkv = configuration?.infuseDiscContainer === 'mkv';
+    setStatus($('#disc-container-status'), busy ? 'warn' : mkv ? 'on' : 'off', busy ? '正在保存或检查' : mkv ? 'MKV · 按需复制封装' : 'ISO · 默认方式',
+      mkv ? '普通原盘按需封装为 MKV；不进行 P7 转换时不需要 libdovi。与下方功能共用片段缓存和 FFmpeg。' : '普通原盘沿用 ISO 播放路径；已开启的杜比视界转换仍使用 MKV。');
     for (const id of ['enable-dolby-vision','dv-save','dv-check', ...ids]) $('#' + id).disabled = busy || settingsSaving;
     const available = !!status?.available;
     setStatus($('#dolby-vision-status'), busy ? 'warn' : !enabled ? 'off' : available ? 'on' : 'warn',
@@ -37,6 +42,8 @@
   }
   $('#enable-dolby-vision').onchange = () => save({ enableInfuseDolbyVision: $('#enable-dolby-vision').checked },
     '杜比视界开关已保存。请在 Infuse 中强制退出再打开并重新同步媒体库。');
+  $('#infuse-disc-container').onchange = () => save({ infuseDiscContainer: $('#infuse-disc-container').value },
+    '原盘封装格式已保存。请退出播放，强制退出 Infuse 后重新打开并同步媒体库。');
   $('#dv-save').onclick = async () => {
     await save({ dolbyVisionCacheMiB: Number($('#dv-session-cache').value), dolbyVisionGlobalCacheMiB: Number($('#dv-global-cache').value),
       dolbyVisionFfmpegPath: $('#dv-ffmpeg-path').value.trim(), dolbyVisionLibraryPath: $('#dv-library-path').value.trim() }, '杜比视界设置已保存。正在播放时修改这些设置会停止当前转换，请重新打开影片。');

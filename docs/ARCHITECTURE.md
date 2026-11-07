@@ -86,6 +86,16 @@ App `Chapters/NativeChapterService.cs` 负责独立配置和插件确认；`Nati
 
 ## 关键验证
 
+### Infuse MKV 呈现与 DV 转换
+
+`Proxy/Matroska/InfuseMatroskaProxy` 负责普通 MKV 与 DV MKV 共用的
+元数据、Range、权限、容器切换与旧 URL 失效。`DvDiscPlan`、`DvInput`、
+`DvSessionCache` 和 `VirtualMatroska` 复用有界片段规划与缓存；计划签名
+区分复制与转换。`DvFragmentBuilder` 只在转换模式调用 libdovi；普通
+模式使用 `MatroskaFragment.Copy` 保留所有压缩包及轨道定义。ISO 直读
+继续由 Chapters 模块负责。设置变更销毁旧引擎，取消旧请求并释放缓存。
+详见 [封装格式](INFUSE-CONTAINERS.md) 与 [杜比视界兼容](INFUSE-DOLBY-VISION.md)。
+
 ### Infuse 章节呈现（独立实验模块）
 
 `Proxy/Chapters` 不参与数据库章节写入或截图调度。`DiscChapterPresentation` 读取已保存 Emby 章节并匹配正片；`MplsChapterPatch` 将时间点映射到各 PlayItem；`VirtualUdfImage` 组织只读 UDF 元数据和原始文件区间；`InfuseChapterProxy` 负责独立开关、Infuse 元数据响应、逐请求权限与 HTTP Range。无外部命令、编码、整盘缓存。此模块已完成本机结构/HTTP 验证，实际 Infuse 兼容仍由客户端测试确认。详见 [Infuse 章节](INFUSE-CHAPTERS.md)。

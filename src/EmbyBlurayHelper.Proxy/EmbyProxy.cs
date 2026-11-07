@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using EmbyBlurayHelper.Proxy.Chapters;
 using EmbyBlurayHelper.Proxy.DolbyVision;
+using EmbyBlurayHelper.Proxy.Matroska;
 
 namespace EmbyBlurayHelper.Proxy;
 
@@ -14,7 +15,7 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
     Func<JsonElement, DiscChapterPresentation?>? chapterPresentationFactory = null, DiscListingStore? discListings = null, DvRuntime? dvRuntime = null)
 {
     private readonly InfuseChapterProxy chapterProxy = new(config, client, cache, logger, chapterPresentationFactory, discListings);
-    private readonly InfuseDolbyVisionProxy dolbyProxy = new(config, client, dvRuntime ?? new DvRuntime(DvOptions.From(config), logger), logger);
+    private readonly InfuseMatroskaProxy matroskaProxy = new(config, client, dvRuntime ?? new DvRuntime(DvOptions.From(config), logger), logger);
     private static readonly Regex StreamPath = new("^(?:/emby)?/videos/(?<id>[^/]+)/stream(?:\\.[a-z0-9]+)?/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PlaybackReportPath = new("^(?:/emby)?/sessions/playing(?:/(?:progress|stopped))?/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     internal const int MaxBufferedPlaybackReportBytes = 1024 * 1024;
@@ -27,7 +28,7 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
         var path = context.Request.Path.Value ?? "/";
         var match = StreamPath.Match(path);
         if (match.Success && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) &&
-            await dolbyProxy.TryStreamAsync(context, match.Groups["id"].Value)) return;
+            await matroskaProxy.TryStreamAsync(context, match.Groups["id"].Value)) return;
         if (match.Success && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) &&
             await chapterProxy.TryStreamAsync(context, match.Groups["id"].Value)) return;
         if ((config.EnableInfuseLanguagePatch || config.EnableInfuseMultiClipPlayback) && match.Success && IsInfuse(context.Request) &&
@@ -45,14 +46,14 @@ internal sealed class EmbyProxy(ProxyConfiguration config, HttpClient client, IM
         if (request.Content is not null && context.Request.ContentLength is null && IsPlaybackReport(context.Request) &&
             !await BufferPlaybackReportAsync(context, request)) return;
         var chapterMetadata = chapterProxy.IsMetadata(context);
-        var dolbyMetadata = dolbyProxy.IsMetadata(context);
+        var dolbyMetadata = matroskaProxy.IsMetadata(context);
         if (chapterMetadata || dolbyMetadata) { request.Headers.AcceptEncoding.Clear(); request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity")); }
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
         CopyHeaders(response, context.Response);
         if ((chapterMetadata || dolbyMetadata) && response.IsSuccessStatusCode && response.Content.Headers.ContentType?.MediaType == "application/json" && !HttpMethods.IsHead(context.Request.Method))
         {
             var original = await response.Content.ReadAsByteArrayAsync(context.RequestAborted);
-            var changed = dolbyMetadata ? await dolbyProxy.RewriteMetadataAsync(context, original) : null;
+            var changed = dolbyMetadata ? await matroskaProxy.RewriteMetadataAsync(context, original) : null;
             var chapterChanged = chapterMetadata ? await chapterProxy.RewriteMetadataAsync(context, changed ?? original) : null;
             var output = chapterChanged ?? changed ?? original;
             if (changed is not null || chapterChanged is not null) { context.Response.Headers.Remove("ETag"); context.Response.Headers.Remove("Content-Encoding"); context.Response.Headers.Remove("Content-MD5"); context.Response.Headers.CacheControl = "no-store"; }

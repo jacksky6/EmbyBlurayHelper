@@ -8,6 +8,7 @@ internal sealed record VirtualMediaName(string FileName, string Path)
 {
     internal static VirtualMediaName Chapters(string source) => Create(source, "Chapters", ".iso");
     internal static VirtualMediaName DolbyVision(string source) => Create(source, "P81", ".mkv");
+    internal static VirtualMediaName Remux(string source) => Create(source, "Remux", ".mkv");
     internal static VirtualMediaName MultiClip(string source) => Create(source, "MultiClip", ".m2ts");
     internal static VirtualMediaName Language(string source) => Create(source, "Language", ".m2ts");
 

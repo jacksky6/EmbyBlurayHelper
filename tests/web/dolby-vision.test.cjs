@@ -29,6 +29,11 @@ const settle = async () => { for (let n = 0; n < 12; n++) await new Promise(reso
   w.fillSettings({settings:server,executablePath:'/helper',dataDirectory:'/data'}); d.querySelector('#console').hidden=false;
   vm.runInContext(fs.readFileSync(path.join(root,'src/EmbyBlurayHelper.App/Web/dolby-vision.js'),'utf8'),dom.getInternalVMContext()); await settle();
   check(!d.querySelector('#enable-dolby-vision').checked, 'new feature defaults off');
+  check(d.querySelector('#infuse-disc-container').value === 'iso', 'existing configuration keeps ISO by default');
+  const container = d.querySelector('#infuse-disc-container'); container.value='mkv'; container.dispatchEvent(new w.Event('change')); await settle();
+  check(server.infuseDiscContainer === 'mkv' && !server.enableInfuseDolbyVision, 'ordinary remux saves without enabling DV');
+  reject=true; container.value='iso'; container.dispatchEvent(new w.Event('change')); await settle();
+  check(container.value==='mkv' && !container.disabled, 'failed format save restores actual format and unlocks controls'); reject=false;
   check(d.querySelector('#dv-session-cache').value === '512' && d.querySelector('#dv-global-cache').value === '1024', '512 MiB / 1 GiB defaults shown');
   d.querySelector('#emby-url').value = 'http://unsaved:8096';
   const toggle = d.querySelector('#enable-dolby-vision'); toggle.checked=true; toggle.dispatchEvent(new w.Event('change')); await settle();

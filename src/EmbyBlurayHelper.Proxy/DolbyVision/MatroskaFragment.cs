@@ -85,6 +85,12 @@ internal sealed class MatroskaFragment
                 block[(offset + 3)..], duration));
         }
     }
+    internal (byte[] Tracks, List<Packet> Packets, int Video, int Rpus) Copy()
+    {
+        var video = Tracks.Where(t => t.Type == 1).MaxBy(t => t.Width)
+            ?? throw new InvalidDataException("Missing video track in remux fragment.");
+        return (Ebml.Bytes(0x1654ae6b, Ebml.Join(Tracks.Select(t => Ebml.Bytes(0xae, t.Definition)))), Packets, video.Number, 0);
+    }
     internal (byte[] Tracks, List<Packet> Packets, int Video, int Rpus) Convert(DoviNative dovi, byte level = 6, Memory<byte> workspace = default)
     {
         var videos = Tracks.Where(t => t.Type == 1).OrderByDescending(t => t.Width).ToArray();

@@ -5,13 +5,21 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using EmbyBlurayHelper.Proxy.DolbyVision;
 
-namespace EmbyBlurayHelper.Proxy.DolbyVision;
+namespace EmbyBlurayHelper.Proxy.Matroska;
 
-internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClient client, DvRuntime runtime, ILogger logger)
+// Shared HTTP presentation for copy-only MKV and P7 conversion. Disc planning,
+// bounded fragment generation and cache remain in the shared streaming engine.
+internal sealed class InfuseMatroskaProxy(ProxyConfiguration config, HttpClient client, DvRuntime runtime, ILogger logger)
 {
     private static readonly Regex MetadataRoute = new("^(?:/emby)?/(?:Items/[^/]+/PlaybackInfo|(?:Users/[^/]+/)?Items(?:/[^/]+)?)/?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    internal bool IsMetadata(HttpContext context) => config.EnableInfuseDolbyVision && runtime.Available && EmbyProxy.IsInfuse(context.Request) && MetadataRoute.IsMatch(context.Request.Path);
+    private bool Enabled => config.EnableInfuseDolbyVision && runtime.Available || config.InfuseDiscContainer == "mkv" && runtime.RemuxAvailable;
+    private bool? Mode(JsonElement source) => config.EnableInfuseDolbyVision && runtime.Available && DvDiscPlan.Candidate(source) ? true
+        : config.InfuseDiscContainer == "mkv" && runtime.RemuxAvailable && DvDiscPlan.DiscCandidate(source) ? false : null;
+    private static VirtualMediaName Name(string path, bool convert) => convert ? VirtualMediaName.DolbyVision(path) : VirtualMediaName.Remux(path);
+    private static string Flag(bool convert) => convert ? "HelperDv" : "HelperRemux";
+    internal bool IsMetadata(HttpContext context) => Enabled && EmbyProxy.IsInfuse(context.Request) && MetadataRoute.IsMatch(context.Request.Path);
     private static string Text(JsonElement obj, string name) => obj.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
     private static string Text(JsonNode? value) => value is JsonValue v && v.TryGetValue<string>(out var text) ? text : "";
     private static string Caller(HttpContext context) => string.Concat(new[] { "api_key", "X-Emby-Token", "X-Emby-Authorization", "UserId" }
@@ -45,11 +53,11 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
         foreach (var item in catalog.GetProperty("Items").EnumerateArray())
         {
             if (!item.TryGetProperty("MediaSources", out var sources)) continue;
-            foreach (var source in sources.EnumerateArray().Where(DvDiscPlan.Candidate))
+            foreach (var source in sources.EnumerateArray().Where(s => Mode(s).HasValue))
             {
                 try
                 {
-                    var presentation = await runtime.Describe(source, context.RequestAborted); var id = Text(item, "Id");
+                    var presentation = await runtime.Describe(source, context.RequestAborted, Mode(source)!.Value); var id = Text(item, "Id");
                     if (!known.TryGetValue(id, out var list)) known[id] = list = [];
                     list.Add((Text(source, "Id"), Text(source, "Path"), presentation));
                 }
@@ -66,25 +74,25 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
             {
                 var match = matches.FirstOrDefault(m => m.Source == Text(source["Id"])); if (match.Presentation is null) continue;
                 var plan = match.Presentation.Plan;
-                var name = VirtualMediaName.DolbyVision(match.Path);
+                var name = Name(match.Path, plan.ConvertDolbyVision);
                 source["Container"] = "mkv"; source["Path"] = name.Path; source["Name"] = name.FileName; source["Size"] = plan.Length;
                 source["SupportsDirectPlay"] = true; source["SupportsDirectStream"] = true; source["SupportsTranscoding"] = false;
-                source["DirectStreamUrl"] = "/emby/Videos/" + Uri.EscapeDataString(id) + "/stream.mkv?Static=true&MediaSourceId=" + Uri.EscapeDataString(match.Source) + "&HelperDv=" + plan.Signature + Caller(context);
+                source["DirectStreamUrl"] = "/emby/Videos/" + Uri.EscapeDataString(id) + "/stream.mkv?Static=true&MediaSourceId=" + Uri.EscapeDataString(match.Source) + "&" + Flag(plan.ConvertDolbyVision) + "=" + plan.Signature + Caller(context);
                 source.Remove("TranscodingUrl"); source.Remove("TranscodingContainer"); source["MimeType"] = "video/x-matroska";
-                RewriteStreams(source); changed = true;
+                RewriteStreams(source, plan.ConvertDolbyVision); changed = true;
             }
             if (matches.Count == 1 && (obj["MediaSources"] is not JsonArray all || all.Count == 1))
             {
                 if (obj.ContainsKey("Container")) obj["Container"] = "mkv";
-                if (obj.ContainsKey("Path")) obj["Path"] = VirtualMediaName.DolbyVision(matches[0].Path).Path;
+                if (obj.ContainsKey("Path")) obj["Path"] = Name(matches[0].Path, matches[0].Presentation.Plan.ConvertDolbyVision).Path;
                 if (obj.ContainsKey("Size")) obj["Size"] = matches[0].Presentation.Plan.Length;
-                RewriteStreams(obj); changed = true;
+                RewriteStreams(obj, matches[0].Presentation.Plan.ConvertDolbyVision); changed = true;
             }
         }
-        if (changed) logger.LogInformation("Infuse DV: metadata {Route}; {Count} eligible disc items; virtual MKV with on-demand P8.1, no whole-film conversion.", context.Request.Path.Value, known.Count);
+        if (changed) logger.LogInformation("Infuse MKV: metadata {Route}; {Count} eligible disc items; ordinary container {Container}; P7 conversion {DV}; on-demand fragments.", context.Request.Path.Value, known.Count, config.InfuseDiscContainer, config.EnableInfuseDolbyVision);
         return changed ? Encoding.UTF8.GetBytes(root!.ToJsonString()) : null;
     }
-    private static void RewriteStreams(JsonObject obj)
+    private static void RewriteStreams(JsonObject obj, bool convert)
     {
         if (obj["MediaStreams"] is not JsonArray streams) return;
         var video = streams.OfType<JsonObject>().Where(s => Text(s["Type"]) == "Video").OrderByDescending(s => (int?)s["Width"] ?? 0).FirstOrDefault();
@@ -92,12 +100,13 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
         var mapping = new Dictionary<int, int>(); var result = new JsonArray(); var internalIndex = 0;
         foreach (var stream in streams.OfType<JsonObject>())
         {
-            if (Text(stream["Type"]) == "Video" && stream != video) continue;
+            if (convert && Text(stream["Type"]) == "Video" && stream != video) continue;
+            if (Text(stream["Type"]) is not ("Video" or "Audio" or "Subtitle")) continue;
             var copy = (JsonObject)stream.DeepClone(); var external = (bool?)copy["IsExternal"] == true;
             var newIndex = external ? (int?)copy["Index"] ?? result.Count : internalIndex++;
             if ((int?)copy["Index"] is { } index) mapping[index] = newIndex;
             copy["Index"] = newIndex;
-            if (stream == video)
+            if (convert && stream == video)
             {
                 copy["ExtendedVideoType"] = "DolbyVision"; copy["VideoRange"] = "DolbyVision"; copy["ExtendedVideoSubType"] = "DoviProfile81";
                 copy["ExtendedVideoSubTypeDescription"] = "Profile 8.1 (HDR10 compatible)";
@@ -112,10 +121,16 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
     internal async Task<bool> TryStreamAsync(HttpContext context, string itemId)
     {
         var explicitDv = context.Request.Query.ContainsKey("HelperDv");
-        if (!EmbyProxy.IsInfuse(context.Request)) { if (explicitDv) { context.Response.StatusCode = 403; return true; } return false; }
-        if (!config.EnableInfuseDolbyVision) { if (explicitDv) { context.Response.StatusCode = 410; return true; } return false; }
-        if (!explicitDv && !string.Equals(context.Request.Query["Static"], "true", StringComparison.OrdinalIgnoreCase)) return false;
-        if (!runtime.Available) { if (explicitDv) { context.Response.StatusCode = 503; return true; } return false; }
+        var explicitRemux = context.Request.Query.ContainsKey("HelperRemux");
+        var explicitMkv = explicitDv || explicitRemux;
+        if (!EmbyProxy.IsInfuse(context.Request)) { if (explicitMkv) { context.Response.StatusCode = 403; return true; } return false; }
+        if (explicitDv && explicitRemux) { context.Response.StatusCode = 409; return true; }
+        if (explicitDv && !config.EnableInfuseDolbyVision || explicitRemux && config.InfuseDiscContainer != "mkv")
+        { context.Response.StatusCode = 410; return true; }
+        if (explicitDv && !runtime.Available || explicitRemux && !runtime.RemuxAvailable)
+        { context.Response.StatusCode = 503; return true; }
+        if (!Enabled) return false;
+        if (!explicitMkv && !string.Equals(context.Request.Query["Static"], "true", StringComparison.OrdinalIgnoreCase)) return false;
         try
         {
             var catalog = await Catalog(context, [itemId]);
@@ -124,13 +139,15 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
                 if (item.TryGetProperty("MediaSources", out var sources)) foreach (var s in sources.EnumerateArray())
                     if (Text(s, "Id") == sourceId || sourceId.Length == 0 && sources.GetArrayLength() == 1) { source = s; break; }
             if (source.ValueKind == JsonValueKind.Undefined) { context.Response.StatusCode = 404; return true; }
-            if (!DvDiscPlan.Candidate(source)) { if (explicitDv) { context.Response.StatusCode = 409; return true; } return false; }
+            var mode = Mode(source);
+            if (!mode.HasValue || explicitMkv && (explicitDv != mode.Value))
+            { if (explicitMkv) { context.Response.StatusCode = 409; return true; } return false; }
             DvRuntime.Presentation presentation;
-            try { presentation = await runtime.Describe(source, context.RequestAborted); }
-            catch (Exception e) when (!explicitDv && e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or OverflowException)
+            try { presentation = await runtime.Describe(source, context.RequestAborted, mode.Value); }
+            catch (Exception e) when (!explicitMkv && e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or OverflowException)
             { logger.LogWarning("Infuse DV: item {Item}; unsupported disc keeps original playback: {Reason}", itemId, e.Message); return false; }
             var plan = presentation.Plan;
-            if (explicitDv && context.Request.Query["HelperDv"].ToString() != plan.Signature) { context.Response.StatusCode = 409; return true; }
+            if (explicitMkv && context.Request.Query[Flag(mode.Value)].ToString() != plan.Signature) { context.Response.StatusCode = 409; return true; }
             // Visibility alone is insufficient: check Emby's playback policy
             // with the caller's credentials on every HEAD and range/cache hit.
             using var headRequest = EmbyProxy.CreateRequest(context, new Uri(config.UpstreamBaseUrl.TrimEnd('/') + "/emby/Videos/" + Uri.EscapeDataString(itemId) + "/stream?Static=true&MediaSourceId=" + Uri.EscapeDataString(Text(source, "Id")) + Caller(context)), "HEAD", false);
@@ -142,7 +159,7 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
             if (!path.EndsWith("/stream.mkv", StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = 307; context.Response.Headers.Location = context.Request.PathBase + path[..(path.LastIndexOf('/') + 1)] + "stream.mkv" +
-                    (explicitDv ? context.Request.QueryString : context.Request.QueryString.Add("HelperDv", plan.Signature));
+                    (explicitMkv ? context.Request.QueryString : context.Request.QueryString.Add(Flag(mode.Value), plan.Signature));
                 context.Response.Headers.CacheControl = "no-store"; context.Response.ContentLength = 0; return true;
             }
             if (!TryRange(context, plan.Length, plan.Signature, out var start, out var end, out var partial))
@@ -151,10 +168,10 @@ internal sealed class InfuseDolbyVisionProxy(ProxyConfiguration config, HttpClie
             var header = await runtime.Header(presentation, session, context.RequestAborted);
             context.Response.StatusCode = partial ? 206 : 200; context.Response.ContentType = "video/x-matroska"; context.Response.ContentLength = end - start + 1;
             context.Response.Headers.AcceptRanges = "bytes"; context.Response.Headers.CacheControl = "no-store"; context.Response.Headers.ETag = "\"" + plan.Signature + "\"";
-            context.Response.Headers.ContentDisposition = VirtualMediaName.DolbyVision(Text(source, "Path")).ContentDisposition;
+            context.Response.Headers.ContentDisposition = Name(Text(source, "Path"), mode.Value).ContentDisposition;
             if (partial) context.Response.Headers.ContentRange = $"bytes {start}-{end}/{plan.Length}";
             if (!HttpMethods.IsHead(context.Request.Method)) await Copy(context, presentation, session, header, start, end);
-            logger.LogInformation("Infuse DV: item {Item}; {Method} bytes {Start}-{End}/{Length}; on-demand P8.1.", itemId, context.Request.Method, start, end, plan.Length);
+            logger.LogInformation("Infuse MKV: item {Item}; {Method} bytes {Start}-{End}/{Length}; {Mode}.", itemId, context.Request.Method, start, end, plan.Length, mode.Value ? "P7→P8.1" : "copy-only remux");
             return true;
         }
         catch (CatalogException e) { context.Response.StatusCode = e.Status; return true; }

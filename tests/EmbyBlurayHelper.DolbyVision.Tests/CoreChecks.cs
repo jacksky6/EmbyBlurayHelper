@@ -1,5 +1,6 @@
 using EmbyBlurayHelper.Proxy.DolbyVision;
 using Microsoft.AspNetCore.Http;
+using InfuseDolbyVisionProxy = EmbyBlurayHelper.Proxy.Matroska.InfuseMatroskaProxy;
 
 internal static class CoreChecks
 {
@@ -20,6 +21,15 @@ internal static class CoreChecks
         check(Language(audio.Tracks[0]) == "fra", "existing native language takes precedence over saved metadata");
         audio = AudioTracks(); audio.FillMissingLanguages([new(2, "ac3", "eng"), new(2, "truehd", "zho")]);
         check(audio.Tracks.All(t => Language(t) == "und"), "different codec order cannot misassign source languages");
+        var ordinary = new MatroskaFragment();
+        ordinary.Tracks.Add(new(1, 1, "V_MPEG4/ISO/AVC", Ebml.Number(0xd7, 1), [], 1920));
+        ordinary.Tracks.Add(new(2, 2, "A_DTS", Ebml.Number(0xd7, 2), [], 0));
+        ordinary.Packets.Add(new(1, 12, true, 0x80, new byte[] { 1, 2, 3 }));
+        ordinary.Packets.Add(new(2, 12, false, 0, new byte[] { 4, 5 }));
+        var copy = ordinary.Copy();
+        check(copy.Packets.SequenceEqual(ordinary.Packets) && copy.Rpus == 0 && copy.Video == 1,
+            "ordinary AVC/DTS remux copies every packet without HEVC parsing or libdovi");
+        check(Ebml.Read(Ebml.Read(copy.Tracks).Single().Data).Count() == 2, "ordinary remux retains both track definitions");
         audio = AudioTracks(); audio.FillMissingLanguages([new(2, "truehd", "und"), new(2, "ac3", "unknown")]);
         check(audio.Tracks.All(t => Language(t) == "und"), "unknown source language stays unknown");
         var context = new DefaultHttpContext();

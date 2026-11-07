@@ -11,7 +11,7 @@ internal static class VirtualMatroska
             Ebml.Text(0x4282, "matroska"), Ebml.Number(0x4287, 4), Ebml.Number(0x4285, 2));
         var segmentStart = ebml.Length + 12;
         var info = Ebml.Bytes(0x1549a966, Ebml.Number(0x2ad7b1, 1000000), Ebml.Text(0x4d80, "EmbyBlurayHelper"),
-            Ebml.Text(0x5741, "EmbyBlurayHelper P8.1"), Ebml.Float(0x4489, plan.DurationMs));
+            Ebml.Text(0x5741, plan.ConvertDolbyVision ? "EmbyBlurayHelper P8.1" : "EmbyBlurayHelper Remux"), Ebml.Float(0x4489, plan.DurationMs));
         var chapters = Ebml.Bytes(0x1043a770, Ebml.Bytes(0x45b9, Ebml.Join(plan.Chapters.Select((t, i) => Ebml.Bytes(0xb6,
             Ebml.Number(0x73c4, (ulong)i + 1), Ebml.Number(0x91, (ulong)t * 1000000), Ebml.Number(0x98, 0), Ebml.Number(0x4598, 1),
             Ebml.Bytes(0x80, Ebml.Text(0x85, "Chapter " + (i + 1)), Ebml.Text(0x437c, "eng")))))));

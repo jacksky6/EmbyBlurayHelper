@@ -81,9 +81,13 @@ internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<Ma
             var fragment = MatroskaFragment.Parse(bytes);
             fragment.FillMissingLanguages(plan.SourceLanguages);
             Select(fragment, startMs, endMs, segment.End == segment.Clip.Index.Bytes);
-            using var converter = new DoviNative(libdovi);
-            var pictures = pictureScratch ??= GC.AllocateUninitializedArray<byte>(128 * 1024 * 1024);
-            var result = fragment.Convert(converter, plan.Level, pictures);
+            var result = fragment.Copy();
+            if (plan.ConvertDolbyVision)
+            {
+                using var converter = new DoviNative(libdovi);
+                var pictures = pictureScratch ??= GC.AllocateUninitializedArray<byte>(128 * 1024 * 1024);
+                result = fragment.Convert(converter, plan.Level, pictures);
+            }
             verify?.Invoke(fragment, result.Packets);
             var cluster = MatroskaFragment.Cluster(result.Packets, segment.Clip.InMs - segment.Clip.TimelineMs);
             if (cluster.Length + 9 > segment.SlotBytes) throw new InvalidDataException("Converted GOP exceeds its reserved virtual slot.");

@@ -257,6 +257,8 @@ app.MapGet("/api/settings", () => new { settings = settings.Current, hasApiKey =
 app.MapPost("/api/settings", async (HelperSettings input, CancellationToken token) =>
 {
     SettingsStore.Validate(input);
+    if (input.InfuseDiscContainer == "mkv" && (settings.Current.InfuseDiscContainer != "mkv" || SettingsStore.DvFfmpeg(input) != SettingsStore.DvFfmpeg(settings.Current)))
+        await DvDependencies.CheckRemux(DvOptions.From(new ProxyConfiguration { DolbyVisionFfmpegPath = SettingsStore.DvFfmpeg(input) }), token);
     if (input.EnableInfuseDolbyVision && (!settings.Current.EnableInfuseDolbyVision ||
         SettingsStore.DvFfmpeg(input) != SettingsStore.DvFfmpeg(settings.Current) || SettingsStore.DvLibrary(input) != SettingsStore.DvLibrary(settings.Current)))
         await DvDependencies.Check(new(true, SettingsStore.DvFfmpeg(input), SettingsStore.DvLibrary(input), input.DolbyVisionCacheMiB, input.DolbyVisionGlobalCacheMiB), token);
@@ -298,7 +300,7 @@ app.MapGet("/api/infuse/multiclip", () => integration.GetMultiClipStatus());
 app.MapGet("/api/infuse/dolby-vision", () =>
 {
     var options = DvOptions.From(settings.ProxyConfiguration());
-    return new { enabled = options.Enabled, available = dvRuntime.Available, ffmpegPath = options.Ffmpeg, libraryPath = options.Library,
+    return new { enabled = options.Enabled, available = dvRuntime.Available, remuxAvailable = dvRuntime.RemuxAvailable, discContainer = options.DiscContainer, ffmpegPath = options.Ffmpeg, libraryPath = options.Library,
         sessionCacheMiB = options.SessionMiB, globalCacheMiB = options.GlobalMiB, cache = dvRuntime.Cache.Status() };
 });
 app.MapPost("/api/infuse/dolby-vision/check", async (CancellationToken token) =>

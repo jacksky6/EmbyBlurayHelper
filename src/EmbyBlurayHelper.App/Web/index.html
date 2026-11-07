@@ -174,6 +174,13 @@
     <div class="panel settings-panel"><div class="toggle-row"><span class="feature-icon mint"><svg><use href="#activity"/></svg></span><div class="toggle-copy"><h2>Infuse UHD 语言补写</h2><p>Infuse 静态播放 4K 蓝光原盘时，补写 PMT 中缺失的音轨和字幕语言标签。</p></div><label class="switch"><input id="enable-infuse" type="checkbox" role="switch" aria-label="启用 Infuse UHD 语言补写"><span></span></label></div>
      <div class="status-box" id="infuse-language-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong id="infuse-language-title">已关闭</strong><p id="infuse-language-copy">开启后，Infuse 播放 UHD 原盘时按原盘语言补写音轨和字幕标签。</p></div></div>
      <div class="info-strip"><span><svg><use href="#check"/></svg>保留音视频内容</span><span><svg><use href="#check"/></svg>原盘只读</span><span><svg><use href="#check"/></svg>按需内存处理</span></div></div>
+   <div class="panel settings-panel spaced" id="disc-container-panel">
+    <div class="toggle-row"><span class="feature-icon mint"><svg><use href="#disc"/></svg></span><div class="toggle-copy"><h2>普通原盘封装格式</h2><p>为 Infuse 的 BDMV / Blu-ray ISO 选择播放格式，方便日常对比。</p></div></div>
+    <label for="infuse-disc-container">播放格式（选择后立即保存）</label><select id="infuse-disc-container"><option value="iso">ISO（默认，沿用原盘直读方式）</option><option value="mkv">MKV（实验，按需复制封装）</option></select>
+    <div class="status-box" id="disc-container-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong>ISO · 默认方式</strong><p>等待读取设置。</p></div></div>
+    <p class="field-help">ISO 沿用现有原盘播放与章节开关；MKV 按当前请求生成片段，不重新编码，不预先封装整片，保留音轨、字幕语言和 Emby 已保存的章节，但会增加 FFmpeg 与缓存开销。杜比视界 P7→P8.1 转换始终使用 MKV，优先于此选择。</p>
+    <p class="field-help">切换前先退出播放；保存后强制退出 Infuse，再打开并重新同步媒体库。无法安全匹配的复杂原盘会保留原播放方式，并记录原因。缓存及封装工具与下方杜比视界功能共用；普通 MKV 封装不需要 libdovi。</p>
+   </div>
    <div class="panel settings-panel spaced" id="dolby-vision-panel">
     <div class="toggle-row"><span class="feature-icon lavender"><svg><use href="#activity"/></svg></span><div class="toggle-copy"><h2>Infuse 杜比视界兼容 <span class="new-feature">实验功能</span></h2><p>播放 UHD 蓝光原盘时，按需把 Dolby Vision Profile 7 转换为兼容 Apple TV 的 Profile 8.1。</p></div><label class="switch"><input id="enable-dolby-vision" type="checkbox" role="switch" aria-label="启用 Infuse 杜比视界兼容"><span></span></label></div>
     <div class="status-box" id="dolby-vision-status" data-state="off" role="status" aria-live="polite"><span class="status-dot"></span><div><strong>已关闭</strong><p>默认关闭。仅处理经过播放代理的 Infuse，其他客户端按原方式播放。</p></div></div>

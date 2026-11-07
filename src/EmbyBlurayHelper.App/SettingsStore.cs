@@ -15,6 +15,7 @@ internal sealed record HelperSettings
     public bool EnableInfuseMultiClipPlayback { get; init; }
     public bool EnableInfuseChapters { get; init; }
     public bool EnableInfuseDolbyVision { get; init; }
+    public string InfuseDiscContainer { get; init; } = "iso";
     public string DolbyVisionFfmpegPath { get; init; } = "";
     public string DolbyVisionLibraryPath { get; init; } = "";
     public int DolbyVisionCacheMiB { get; init; } = 512;
@@ -89,6 +90,7 @@ internal sealed class SettingsStore
         EnableInfuseMultiClipPlayback = Current.EnableInfuseMultiClipPlayback,
         EnableInfuseChapters = Current.EnableInfuseChapters,
         EnableInfuseDolbyVision = Current.EnableInfuseDolbyVision,
+        InfuseDiscContainer = Current.InfuseDiscContainer,
         DolbyVisionFfmpegPath = DvFfmpeg(Current),
         DolbyVisionLibraryPath = DvLibrary(Current),
         DolbyVisionCacheMiB = Current.DolbyVisionCacheMiB,
@@ -104,6 +106,8 @@ internal sealed class SettingsStore
 
     public static void Validate(HelperSettings settings)
     {
+        if (settings.InfuseDiscContainer is not ("iso" or "mkv"))
+            throw new ArgumentException("普通原盘封装格式必须是 iso 或 mkv。");
         if (settings.EmbyApiKey is null || settings.UpstreamProbePath is null || settings.FeatureProbePath is null)
             throw new ArgumentException("API key 和探测器路径不能为 null；未配置时请留空。");
         if (settings.DolbyVisionFfmpegPath is null || settings.DolbyVisionLibraryPath is null ||

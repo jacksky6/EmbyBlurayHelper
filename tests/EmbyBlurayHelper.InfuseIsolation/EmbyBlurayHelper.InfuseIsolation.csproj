@@ -10,6 +10,7 @@
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/VirtualMediaName.cs" Link="Proxy/VirtualMediaName.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/Chapters/*.cs" Link="Proxy/Chapters/%(Filename)%(Extension)" />
     <Compile Include="../../src/EmbyBlurayHelper.Proxy/DolbyVision/*.cs" Link="Proxy/DolbyVision/%(Filename)%(Extension)" />
+    <Compile Include="../../src/EmbyBlurayHelper.Proxy/Matroska/*.cs" Link="Proxy/Matroska/%(Filename)%(Extension)" />
     <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoDiscMetadata.cs" Link="Disc/IsoDiscMetadata.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/IsoMediaHttpSource.cs" Link="Disc/IsoMediaHttpSource.cs" />
     <Compile Include="../../src/EmbyBlurayHelper.ProbeWrapper/BluRayLanguageAugmenter.cs" Link="Disc/BluRayLanguageAugmenter.cs" />

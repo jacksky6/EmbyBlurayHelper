@@ -13,6 +13,7 @@ internal sealed class DvDiscPlan
     internal sealed record Segment(int Number, Clip Clip, long Start, long End, long InputStart, long InputEnd, long ApproxStartMs, long SlotOffset, int SlotBytes);
     internal string Path { get; private init; } = "";
     internal bool Iso { get; private init; }
+    internal bool ConvertDolbyVision { get; private init; } = true;
     internal string Signature { get; private set; } = "";
     internal string Playlist { get; private init; } = "";
     internal long DurationMs { get; private init; }
@@ -27,16 +28,21 @@ internal sealed class DvDiscPlan
     internal bool IsCurrent => stamps.All(s => { var file = new FileInfo(s.Path); return file.Exists && file.Length == s.Length && file.LastWriteTimeUtc.Ticks == s.Stamp; });
     internal static bool Candidate(JsonElement source)
     {
+        return DiscCandidate(source) && source.TryGetProperty("MediaStreams", out var streams) && streams.EnumerateArray().Any(s =>
+            s.TryGetProperty("Type", out var t) && t.GetString() == "Video" && s.TryGetProperty("Width", out var w) && w.GetInt32() >= 3840 &&
+            ((s.TryGetProperty("ExtendedVideoSubType", out var v) && v.GetString()?.StartsWith("DoviProfile7", StringComparison.OrdinalIgnoreCase) == true) ||
+             (s.TryGetProperty("Title", out var title) && title.GetString()?.Contains("Dolby Vision Profile 7", StringComparison.OrdinalIgnoreCase) == true)));
+    }
+    internal static bool DiscCandidate(JsonElement source)
+    {
         if (!source.TryGetProperty("Path", out var value) || value.ValueKind != JsonValueKind.String) return false;
         var path = value.GetString()!; var format = source.TryGetProperty("Container", out var c) ? c.GetString() ?? "" : "";
         if (!path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) && !path.EndsWith("index.bdmv", StringComparison.OrdinalIgnoreCase) && !format.Equals("bluray", StringComparison.OrdinalIgnoreCase)) return false;
         if (new[] { ".mkv", ".mp4", ".m2ts", ".ts", ".strm", ".avi", ".mov" }.Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)) return false;
         return source.TryGetProperty("MediaStreams", out var streams) && streams.EnumerateArray().Any(s =>
-            s.TryGetProperty("Type", out var t) && t.GetString() == "Video" && s.TryGetProperty("Width", out var w) && w.GetInt32() >= 3840 &&
-            ((s.TryGetProperty("ExtendedVideoSubType", out var v) && v.GetString()?.StartsWith("DoviProfile7", StringComparison.OrdinalIgnoreCase) == true) ||
-             (s.TryGetProperty("Title", out var title) && title.GetString()?.Contains("Dolby Vision Profile 7", StringComparison.OrdinalIgnoreCase) == true)));
+            s.TryGetProperty("Type", out var t) && t.GetString() == "Video");
     }
-    internal static DvDiscPlan Create(JsonElement source, CancellationToken token, string engineStamp = "")
+    internal static DvDiscPlan Create(JsonElement source, CancellationToken token, string engineStamp = "", bool convertDolbyVision = true)
     {
         var path = source.GetProperty("Path").GetString()!; var iso = path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase);
         using var image = iso ? File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete) : null;
@@ -50,7 +56,7 @@ internal sealed class DvDiscPlan
         var rate = source.GetProperty("MediaStreams").EnumerateArray().Where(s => s.TryGetProperty("Type", out var type) && type.GetString() == "Video")
             .Select(s => s.TryGetProperty("AverageFrameRate", out var value) && value.TryGetDouble(out var fps) ? fps : 0).Max();
         if (rate is <= 0 or > 60.1) throw new InvalidDataException("DV conversion requires a known UHD frame rate up to 60 fps.");
-        var plan = new DvDiscPlan { Path = path, Iso = iso, Playlist = playlist.Name, DurationMs = (long)Math.Round(playlist.TotalLength * 1000),
+        var plan = new DvDiscPlan { Path = path, Iso = iso, ConvertDolbyVision = convertDolbyVision, Playlist = playlist.Name, DurationMs = (long)Math.Round(playlist.TotalLength * 1000),
             Level = rate <= 24.1 ? (byte)6 : rate <= 30.1 ? (byte)7 : rate <= 48.1 ? (byte)8 : (byte)9,
             Chapters = source.TryGetProperty("Chapters", out var chapters) ? chapters.EnumerateArray().Where(c => !c.TryGetProperty("MarkerType", out var marker) || marker.GetString() is null or "Chapter")
                 .Select(c => c.GetProperty("StartPositionTicks").GetInt64() / 10000).Where(t => t >= 0 && t < playlist.TotalLength * 1000).Distinct().Order().ToArray() : [] };
@@ -85,6 +91,9 @@ internal sealed class DvDiscPlan
             var clip = new Clip(member, index, (long)Math.Round(item.TimeIn * 1000), (long)Math.Round(item.RelativeTimeIn * 1000));
             var starts = new List<int> { 0 };
             for (var i = 1; i < index.Points.Length; i++) if (index.Points[i].Time45 - index.Points[starts[^1]].Time45 >= 4 * 45000) starts.Add(i);
+            // A sub-second tail may contain a declared audio PID with no full
+            // codec header. Keep it in the preceding bounded fragment instead.
+            if (!convertDolbyVision && starts.Count > 1 && index.End45 - index.Points[starts[^1]].Time45 < 2 * 45000) starts.RemoveAt(starts.Count - 1);
             for (var n = 0; n < starts.Count; n++)
             {
                 var first = starts[n]; var next = n + 1 < starts.Count ? starts[n + 1] : index.Points.Length;
@@ -102,7 +111,7 @@ internal sealed class DvDiscPlan
         }
         if (plan.Segments.Count is 0 or > 10000) throw new InvalidDataException("Invalid DV segment count.");
         plan.stamps = stampFiles.Distinct().Select(p => { var f = new FileInfo(p); return (f.FullName, f.Length, f.LastWriteTimeUtc.Ticks); }).ToArray();
-        plan.Signature = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("DV-v2\n" + engineStamp + "\n" + path + "\n" + playlist.Name + "\n" + plan.DurationMs + "|" + plan.Level + "\n" +
+        plan.Signature = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes((convertDolbyVision ? "DV-v2\n" : "Remux-v1\n") + engineStamp + "\n" + path + "\n" + playlist.Name + "\n" + plan.DurationMs + "|" + plan.Level + "\n" +
             string.Join('\n', plan.stamps.Select(s => s.Path + "|" + s.Length + "|" + s.Stamp)) + "\n" + string.Join(',', plan.Chapters) + "\n" +
             string.Join('\n', plan.SourceLanguages.Select(s => s.Type + "|" + s.Codec + "|" + s.Language))))).ToLowerInvariant();
         return plan;
