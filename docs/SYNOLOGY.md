@@ -6,7 +6,7 @@
 
 ## 安装与连接
 
-1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
+1. 在 DSM「套件中心 → 手动安装」中选择 `EmbyBlurayHelper-0.2.0-29-dsm7.2-x86_64.spk`，完成安装并启动。已安装旧版可直接升级，保留设置、账号和原盘语言任务记录。
 2. 打开 `http://NAS-IP:8099`，用户名 `admin`，密码 `123456`。也可从 DSM 的应用图标打开。
 3. 在 DSM「控制面板 → 共享文件夹 → 电影所在共享文件夹 → 编辑 → 权限」中，
    选择「系统内部用户」，给 `embyblurayhelper` **只读**权限。对所有需要读取的媒体共享文件夹重复此步骤。
@@ -62,6 +62,28 @@ Emby 调用 `probe.sh` 时，只读取单独导出的 `probe-settings.json`，�
 旧版“已接入但补全已暂停”的配置会保留，可打开开关重新启用，也可使用提示下的“恢复原探测器”操作。已接入表示 Emby 已配置为调用本工具，已有影片需再次发生实际媒体探测才会更新语言信息。
 
 ## 升级与卸载
+
+### 0.2.0-29：Infuse DV 转换与可选 MKV 封装
+
+汇总此前 Windows 已验证的 Infuse P7→P8.1 按需转换、播放状态上报修复、
+原发布文件名保留及 16 MB 探测 / 失败段 32 MB 重试。新增「Infuse 播放增强
+→ 普通原盘封装格式」：默认 ISO，可切换 MKV 进行日常对比；DV 转换始终
+使用 MKV。复制封装不编码音视频，不提前生成整片文件。P8.1 ISO 实验已停止。
+
+SPK 已附带 Linux x86_64 libdovi，无需另下载。升级后强制刷新 8099 页面；
+需要 DV 时展开「缓存与工具设置」检查工具并打开兼容开关。默认使用 Emby
+原版 ffprobe 同目录的 ffmpeg；libdovi 路径留空，自动使用套件中的库。
+原有开关和缓存配置保留，不会自动打开 DV 或普通 MKV。
+
+在套件中心直接手动安装新版 SPK 升级，**不要先卸载**。配置、账号和
+API key 保留，8099 / 8097 / 8096 端口不变。随附 Emby 插件为 **0.1.10**；
+本次播放功能不依赖 DLL 变更，已加载此版本无需替换。若仍用更老插件，
+在 Emby 插件页从本机 8099 检查并安装更新，完成后手动重启 Emby。
+
+切换格式后先退出影片，强制退出 Infuse 再重新打开、同步媒体库。
+服务端验证与 Windows 真实原盘回归已通过；新版 DSM 的 DV 与普通 MKV
+播放仍需 NAS / Apple TV 验证。详见 [封装格式](INFUSE-CONTAINERS.md) 和
+[杜比视界](INFUSE-DOLBY-VISION.md)。
 
 ### 0.2.0-28：过滤系统合集
 
@@ -170,7 +192,7 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 # 发布后仅重新打包：
 .\scripts\build-synology.ps1 -SkipPublish
 # 下一次版本升级必须递增最后的套件构建号：
-.\scripts\build-synology.ps1 -Version 0.2.0-28
+.\scripts\build-synology.ps1 -Version 0.2.0-29
 ```
 
 打包使用现有 WSL `Ubuntu-26.04` 的 Python 标准库；无需额外安装 SPK SDK。
@@ -178,15 +200,16 @@ Windows 的 .NET SDK 放在 `E:\ProgramFiles\dotnet-8`。在项目根目录运�
 Linux / GitHub Actions 在发布 `linux-x64` 后可直接运行：
 
 ```sh
-python3 scripts/package-synology.py --version 0.2.0-28
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk
+bash scripts/build-dovi-linux.sh
+python3 scripts/package-synology.py --version 0.2.0-29
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-29-dsm7.2-x86_64.spk
 ```
 
 生命周期及跨用户探测测试可在 Linux 运行；加 `--cross-user` 时用 root 启动测试，
 测试会在临时目录内分别以现有的 `nobody`、`daemon` 身份模拟两个套件，不创建系统账号：
 
 ```sh
-python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk --lifecycle --cross-user
+python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-29-dsm7.2-x86_64.spk --lifecycle --cross-user
 ```
 
 打包依据群晖官方 [套件格式](https://help.synology.com/developer-guide/synology_package/INFO.html)、

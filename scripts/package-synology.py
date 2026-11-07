@@ -64,6 +64,9 @@ def build(version, published, output):
     binary = executable.read_bytes()
     if binary[:5] != b"\x7fELF\x02" or struct.unpack_from("<H", binary, 18)[0] != 62:
         raise ValueError("Expected a self-contained Linux x86_64 executable")
+    native_binary = (published / "tools/libdovi.so").read_bytes()
+    if native_binary[:5] != b"\x7fELF\x02" or struct.unpack_from("<H", native_binary, 18)[0] != 62:
+        raise ValueError("Run scripts/build-dovi-linux.sh to stage the Linux x86_64 native library")
     payload_buffer = io.BytesIO()
     with gzip.GzipFile(fileobj=payload_buffer, mode="wb", mtime=0, filename="") as compressed:
         with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as payload:
@@ -77,6 +80,7 @@ def build(version, published, output):
             add(payload, "NATIVE-CHAPTERS.md", source(ROOT / "docs/NATIVE-CHAPTERS.md"))
             add(payload, "DISC-THUMBNAILS.md", source(ROOT / "docs/DISC-THUMBNAILS.md"))
             add(payload, "INFUSE-DOLBY-VISION.md", source(ROOT / "docs/INFUSE-DOLBY-VISION.md"))
+            add(payload, "INFUSE-CONTAINERS.md", source(ROOT / "docs/INFUSE-CONTAINERS.md"))
             add(payload, "tools/README.md", source(ROOT / "packaging/native/README.md"))
             for native in (published / "tools").glob("*"):
                 if native.is_file() and native.name in ("libdovi.so", "libdovi-MIT.txt"):
@@ -116,7 +120,7 @@ def build(version, published, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.2.0-28")
+    parser.add_argument("--version", default="0.2.0-29")
     parser.add_argument("--published", type=Path, default=ROOT / "artifacts/app/linux-x64")
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts/downloads")
     arguments = parser.parse_args()

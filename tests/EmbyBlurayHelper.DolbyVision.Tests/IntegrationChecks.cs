@@ -48,6 +48,14 @@ internal static class IntegrationChecks
             check(s.GetProperty("MediaStreams").EnumerateArray().Count(s => s.GetProperty("Type").GetString() == "Video") == (convert ? 1 : source.GetProperty("MediaStreams").EnumerateArray().Count(s => s.GetProperty("Type").GetString() == "Video")), "metadata preserves only the output video tracks");
         }
         var disabled = new EmbyProxy(config with { EnableInfuseDolbyVision = false, InfuseDiscContainer = "iso", EnableInfuseChapters = false }, client, memory, logger, dvRuntime: runtime);
+        if (convert)
+        {
+            var both = new EmbyProxy(config with { InfuseDiscContainer = "mkv" }, client, memory, logger, dvRuntime: runtime);
+            var preferred = await Call("GET", "/emby/Items", "?Ids=" + itemId + "&Fields=MediaSources,Chapters", instance: both);
+            using var parsed = JsonDocument.Parse(preferred.Bytes);
+            check(parsed.RootElement.GetProperty("Items")[0].GetProperty("MediaSources")[0].GetProperty("DirectStreamUrl").GetString()!.Contains("HelperDv="),
+                "P7 conversion takes precedence when ordinary MKV is also selected");
+        }
         foreach (var (agent, instance) in new[] { ("Infuse-Direct/8.5.9", disabled), ("Emby-Test", proxy) })
         {
             var untouched = await Call("GET", "/emby/Items", "?Ids=" + itemId + "&Fields=MediaSources,Chapters", agent: agent, instance: instance);

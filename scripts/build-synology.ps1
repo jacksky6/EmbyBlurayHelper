@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.0-28',
+    [string]$Version = '0.2.0-29',
     [string]$DotnetPath = 'E:\ProgramFiles\dotnet-8\dotnet.exe',
     [string]$Distribution = 'Ubuntu-26.04',
     [switch]$SkipPublish
@@ -19,6 +19,8 @@ try {
     $linuxProject = & wsl.exe -d $Distribution --exec wslpath -u $projectRoot
     if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the project path inside WSL' }
     $linuxProject = $linuxProject.Trim()
+    & wsl.exe -d $Distribution --cd $linuxProject --exec bash scripts/build-dovi-linux.sh
+    if ($LASTEXITCODE -ne 0) { throw 'DSM-compatible libdovi build failed' }
     & wsl.exe -d $Distribution --cd $linuxProject --exec python3 scripts/package-synology.py --version $Version
     if ($LASTEXITCODE -ne 0) { throw 'SPK packaging failed' }
 } finally { Pop-Location }

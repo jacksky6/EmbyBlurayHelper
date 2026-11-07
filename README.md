@@ -22,6 +22,14 @@ adds confirmed feature metadata. See [使用方式、探测器边界和本机验
 For native Intel/AMD 64-bit NAS installations, a DSM 7.2 SPK is available from
 the build artifacts. See [Synology installation and repeatable packaging](docs/SYNOLOGY.md).
 
+Infuse playback enhancement now supports on-demand **P7→P8.1 Dolby Vision in MKV**,
+without re-encoding video or audio (FEL residual is discarded). Ordinary discs
+default to the existing ISO path; the Web console offers an experimental MKV
+copy-remux choice for BDMV / Blu-ray ISO comparison. Windows x64 and DSM/Linux
+x86_64 packages bundle their native libdovi dependency. See
+[封装格式与切换](docs/INFUSE-CONTAINERS.md), [Dolby Vision](docs/INFUSE-DOLBY-VISION.md)
+and [main / historical recovery points](docs/BRANCHES.md).
+
 The **原盘章节** page restores original MPLS chapter positions for BDMV / Blu-ray
 ISO movies (plugin 0.1.5+), automatically after metadata scans or in a persistent
 per-library batch. It reads only navigation files, preserves custom chapters and

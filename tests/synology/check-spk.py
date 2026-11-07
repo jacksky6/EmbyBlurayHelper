@@ -55,6 +55,11 @@ def validate(path):
                   "ISO/feature plugin, usage and module documentation included")
             check(payload.extractfile("emby-plugin/EmbyBlurayHelper.Plugin.dll").read(2) == b"MZ", "Bundled Emby plugin is a .NET assembly")
             check({"licenses/BDInfo-LGPL-2.1.txt", "licenses/DiscUtils-MIT.txt"} <= payload_names, "All bundled library licenses included")
+            check({"tools/libdovi.so", "tools/libdovi-MIT.txt", "INFUSE-CONTAINERS.md", "INFUSE-DOLBY-VISION.md"} <= payload_names, "DSM DV native library, license and container guides included")
+            native = payload.extractfile("tools/libdovi.so").read()
+            check(native[:5] == b"\x7fELF\x02" and struct.unpack_from("<H", native, 18)[0] == 62, "libdovi is Linux x86_64, not a Windows DLL")
+            versions = {tuple(map(int, value.split(b"."))) for value in re.findall(rb"GLIBC_([0-9.]+)\x00", native)}
+            check(bool(versions) and max(versions) <= (2, 17), "libdovi avoids a modern desktop glibc dependency")
             check(not any(set(Path(name).parts) & {"data", "account.json", "settings.json", "probe-settings.json", "management-key.txt"} for name in payload_names), "No workstation data or credentials packaged")
             binary = payload.extractfile("EmbyBlurayHelper").read()
             check(binary[:5] == b"\x7fELF\x02" and struct.unpack_from("<H", binary, 18)[0] == 62, "Linux x86_64 binary")

@@ -75,12 +75,18 @@ jobs:
         shell: pwsh
         run: ./scripts/stage-dovi-windows.ps1 -Destination artifacts/app/win-x64
       - name: Package unified Web console
+        if: matrix.rid != 'linux-x64'
         run: sh scripts/package-portable.sh ${{ matrix.rid }}
+      - name: Build DSM-compatible Linux libdovi and package portable app
+        if: matrix.rid == 'linux-x64'
+        run: |
+          bash scripts/build-dovi-linux.sh
+          sh scripts/package-portable.sh ${{ matrix.rid }}
       - name: Package DSM 7.2 x86_64
         if: matrix.rid == 'linux-x64'
         run: |
           python3 scripts/package-synology.py
-          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-28-dsm7.2-x86_64.spk --lifecycle
+          python3 tests/synology/check-spk.py artifacts/downloads/EmbyBlurayHelper-0.2.0-29-dsm7.2-x86_64.spk --lifecycle
       - uses: actions/upload-artifact@v4
         if: matrix.rid == 'linux-x64'
         with:

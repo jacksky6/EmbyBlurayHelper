@@ -1,6 +1,6 @@
 # Infuse Dolby Vision 按需兼容
 
-开发日期：2026-11-07。开发分支：`feature/infuse-dolby-vision`。
+开发日期：2026-11-07。已整理进入 `main`；原开发分支为 `feature/infuse-dolby-vision`。
 恢复起点：`ffeebf1`；更早的稳定功能基线：`f9c0250`。
 
 ## 范围与画质边界
@@ -37,11 +37,18 @@ scripts/stage-dovi-windows.ps1 -Destination artifacts/checks/dv-app-preview
 此脚本只下载固定的官方 libdovi 3.4.0，核验 ZIP 与 DLL 的 SHA256，
 同时复制 MIT 许可证。没有系统级安装。
 
-Linux 默认 `tools/libdovi.so`，macOS 默认 `tools/libdovi.dylib`，也可配置
-完整路径。必须与操作系统、CPU 和系统运行库兼容。**本轮只验证了
-Windows x64 原生库；DSM / Linux / macOS 的库构建和设备验证尚未完成，
-不能把 Windows DLL 放进 SPK 后宣称支持。** 缺失或无法加载时不改写
-Infuse 元数据，不接管原播放。此功能不要求升级 Emby 插件 DLL。
+Linux x86_64 / DSM SPK 自 `0.2.0-29` 起附带 `tools/libdovi.so`。
+使用上游 2.3.4 标签的 libdovi 3.4.0 源码、Rust 1.90.0 与项目内 Zig 0.13.0
+构建，目标为 glibc 2.17；实际最高符号依赖 2.14。已通过 Linux C ABI 加载、
+上游 FEL/MEL 转换向量和直接 mode 2 的 P8 往返校验；DSM 真机播放仍需部署后验证。
+可执行 `bash scripts/build-dovi-linux.sh` 重复构建，不安装系统包、不更改 shell 配置。
+
+macOS 默认 `tools/libdovi.dylib`，尚未附带或验证；Linux arm64 同样需要另备
+兼容原生库。各平台均可配置完整路径，不能混用 Windows DLL。缺失或无法加载
+时不改写 DV 元数据，不接管 DV 转换。此功能不要求升级 Emby 插件 DLL。
+
+普通原盘默认保持 ISO；另有独立的 [ISO / MKV 选择](INFUSE-CONTAINERS.md)。
+P7→P8.1 始终走 MKV；P8.1 ISO 实验经用户反馈失败，已停止。
 
 ## 按需输出与 HTTP
 
