@@ -42,7 +42,7 @@ internal sealed class DvRuntime : IDisposable
     private readonly string engineStamp;
     internal DvRuntime(DvOptions options, ILogger logger)
     {
-        Options = options; this.logger = logger; builder = new(options.Ffmpeg, options.Library);
+        Options = options; this.logger = logger; builder = new(options.Ffmpeg, options.Library, logger: logger);
         if (options.Available)
         {
             try { using var native = new DoviNative(options.Library); Available = true; }

@@ -5,8 +5,26 @@ namespace EmbyBlurayHelper.Proxy.DolbyVision;
 
 internal sealed record DvFragment(byte[] Cluster, byte[] Tracks, int VideoTrack, int Pictures, long InputBytes, long ElapsedMs);
 
-internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<MatroskaFragment, IReadOnlyList<MatroskaFragment.Packet>>? verify = null)
+internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<MatroskaFragment, IReadOnlyList<MatroskaFragment.Packet>>? verify = null, ILogger? logger = null)
 {
+    internal const int DefaultProbeBytes = 16_000_000;
+    internal const int RetryProbeBytes = 32_000_000;
+    internal sealed class RemuxFailure(int exitCode, int probeBytes, string detail)
+        : IOException($"DV fragment remux failed (exit {exitCode}, probe {probeBytes} bytes). {detail}");
+
+    internal static async Task<T> WithProbeRetry<T>(Func<int, CancellationToken, Task<T>> attempt, Action<RemuxFailure>? retry, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        try { return await attempt(DefaultProbeBytes, token); }
+        catch (RemuxFailure e)
+        {
+            token.ThrowIfCancellationRequested();
+            retry?.Invoke(e);
+            token.ThrowIfCancellationRequested();
+            return await attempt(RetryProbeBytes, token);
+        }
+    }
+
     // A global admission gate bounds native processes and transformation scratch
     // memory independently of the configurable media cache.
     private static readonly SemaphoreSlim Worker = new(1, 1);
@@ -28,44 +46,83 @@ internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<Ma
         try
         {
             Interlocked.Exchange(ref lastActivity, DateTime.UtcNow.Ticks);
-            var clock = Stopwatch.StartNew(); using var input = plan.Open(segment);
-            await using var source = new IsoMediaHttpSource(input.Slice, token, readBudget: 256L * 1024 * 1024);
+            var clock = Stopwatch.StartNew();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(60));
-            var info = EmbyToolProcess.CreateStartInfo(ffmpeg);
-            foreach (var argument in new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-copyts", "-probesize", "8000000", "-analyzeduration", "3000000",
-                "-f", "mpegts", "-i", source.Url, "-map", "0:v", "-map", "0:a?", "-map", "0:s?", "-c", "copy", "-avoid_negative_ts", "disabled",
-                "-fflags", "+bitexact", "-max_interleave_delta", "1000000", "-cluster_time_limit", "1000", "-f", "matroska", "pipe:1" }) info.ArgumentList.Add(argument);
-            using var process = Process.Start(info) ?? throw new IOException("Unable to start the DV remuxer.");
-            using var cancel = timeout.Token.Register(() => { try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { } });
-            var errors = ReadBounded(process.StandardError.BaseStream, 64 * 1024, timeout.Token, discardOverflow: true);
+            long inputBytes = 0, startMs = 0, endMs = 0;
+            var probeBytes = DefaultProbeBytes;
             ReadOnlyMemory<byte> bytes;
             try
             {
-                var scratch = remuxScratch ??= GC.AllocateUninitializedArray<byte>(192 * 1024 * 1024);
-                bytes = await ReadInto(process.StandardOutput.BaseStream, scratch, timeout.Token);
-                await process.WaitForExitAsync(timeout.Token); var stderr = await errors;
-                var message = System.Text.Encoding.UTF8.GetString(stderr.Span);
-                if (process.ExitCode != 0) throw new IOException("DV fragment remux failed (exit " + process.ExitCode + "). " + message[..Math.Min(message.Length, 1200)]);
+                bytes = await WithProbeRetry(async (probe, attemptToken) =>
+                {
+                    probeBytes = probe;
+                    attemptToken.ThrowIfCancellationRequested();
+                    var remaining = 256L * 1024 * 1024 - inputBytes;
+                    if (remaining <= 0) throw new IOException("DV fragment exceeded its shared input read budget.");
+                    // Each attempt has a fresh input and HTTP source; partial
+                    // FFmpeg output is discarded before restarting the segment.
+                    using var input = plan.Open(segment);
+                    startMs = input.StartMs; endMs = input.EndMs;
+                    var source = new IsoMediaHttpSource(input.Slice, attemptToken, readBudget: remaining);
+                    try
+                    {
+                        await using (source) { return await Remux(source.Url, probe, attemptToken); }
+                    }
+                    finally { inputBytes += source.BytesRead; }
+                }, e => logger?.LogWarning("Infuse DV: playlist {Playlist}; segment {Segment}/{Total}; at {Time} ms; 16 MB remux failed; retrying once with 32 MB probe: {Reason}",
+                    plan.Playlist, segment.Number + 1, plan.Segments.Count, segment.ApproxStartMs, e.Message), timeout.Token);
             }
-            catch
+            catch (RemuxFailure e) when (probeBytes == RetryProbeBytes)
             {
-                try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { }
-                await process.WaitForExitAsync(CancellationToken.None);
-                try { await errors; } catch (OperationCanceledException) { }
-                token.ThrowIfCancellationRequested(); throw;
+                logger?.LogWarning("Infuse DV: playlist {Playlist}; segment {Segment}/{Total}; 32 MB probe retry failed: {Reason}",
+                    plan.Playlist, segment.Number + 1, plan.Segments.Count, e.Message);
+                throw;
             }
             var fragment = MatroskaFragment.Parse(bytes);
             fragment.FillMissingLanguages(plan.SourceLanguages);
-            Select(fragment, input.StartMs, input.EndMs, segment.End == segment.Clip.Index.Bytes);
+            Select(fragment, startMs, endMs, segment.End == segment.Clip.Index.Bytes);
             using var converter = new DoviNative(libdovi);
             var pictures = pictureScratch ??= GC.AllocateUninitializedArray<byte>(128 * 1024 * 1024);
             var result = fragment.Convert(converter, plan.Level, pictures);
             verify?.Invoke(fragment, result.Packets);
             var cluster = MatroskaFragment.Cluster(result.Packets, segment.Clip.InMs - segment.Clip.TimelineMs);
             if (cluster.Length + 9 > segment.SlotBytes) throw new InvalidDataException("Converted GOP exceeds its reserved virtual slot.");
-            return new(cluster, result.Tracks, result.Video, result.Rpus, source.BytesRead, clock.ElapsedMilliseconds);
+            if (probeBytes == RetryProbeBytes)
+                logger?.LogInformation("Infuse DV: playlist {Playlist}; segment {Segment}/{Total}; 32 MB probe retry succeeded; {Frames} pictures; {Elapsed} ms including first attempt.",
+                    plan.Playlist, segment.Number + 1, plan.Segments.Count, result.Rpus, clock.ElapsedMilliseconds);
+            return new(cluster, result.Tracks, result.Video, result.Rpus, inputBytes, clock.ElapsedMilliseconds);
         }
         finally { Interlocked.Exchange(ref lastActivity, DateTime.UtcNow.Ticks); Worker.Release(); }
+    }
+    private async Task<ReadOnlyMemory<byte>> Remux(string url, int probeBytes, CancellationToken token)
+    {
+        var info = EmbyToolProcess.CreateStartInfo(ffmpeg);
+        foreach (var argument in new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-copyts", "-probesize", probeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture), "-analyzeduration", "3000000",
+            "-f", "mpegts", "-i", url, "-map", "0:v", "-map", "0:a?", "-map", "0:s?", "-c", "copy", "-avoid_negative_ts", "disabled",
+            "-fflags", "+bitexact", "-max_interleave_delta", "1000000", "-cluster_time_limit", "1000", "-f", "matroska", "pipe:1" }) info.ArgumentList.Add(argument);
+        using var process = Process.Start(info) ?? throw new IOException("Unable to start the DV remuxer.");
+        using var cancel = token.Register(() => { try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { } });
+        var errors = ReadBounded(process.StandardError.BaseStream, 64 * 1024, token, discardOverflow: true);
+        try
+        {
+            var scratch = remuxScratch ??= GC.AllocateUninitializedArray<byte>(192 * 1024 * 1024);
+            var bytes = await ReadInto(process.StandardOutput.BaseStream, scratch, token);
+            await process.WaitForExitAsync(token); var stderr = await errors;
+            token.ThrowIfCancellationRequested();
+            var message = System.Text.Encoding.UTF8.GetString(stderr.Span);
+            // Keep the terminal muxer error as well as the initial diagnostic;
+            // repeated SPS/PPS warnings can otherwise hide why writing failed.
+            if (message.Length > 1200) message = message[..600] + "\n...\n" + message[^600..];
+            if (process.ExitCode != 0) throw new RemuxFailure(process.ExitCode, probeBytes, message);
+            return bytes;
+        }
+        catch
+        {
+            try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { }
+            await process.WaitForExitAsync(CancellationToken.None);
+            try { await errors; } catch (OperationCanceledException) { }
+            token.ThrowIfCancellationRequested(); throw;
+        }
     }
     private static async Task<ReadOnlyMemory<byte>> ReadInto(Stream stream, byte[] buffer, CancellationToken token)
     {

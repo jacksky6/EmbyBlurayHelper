@@ -56,7 +56,7 @@ internal static class IntegrationChecks
             VirtualMediaName.DolbyVision(source.GetProperty("Path").GetString()!).FileName, "virtual MKV HTTP filename matches metadata, including Unicode");
         var headerA = await Call("GET", route, query, "bytes=0-1023"); var headerB = await Call("GET", route, query, "bytes=32-127");
         check(headerA.Context.Response.StatusCode == 206 && headerB.Bytes.SequenceEqual(headerA.Bytes[32..128]), "overlapping header ranges return identical bytes");
-        foreach (var index in new[] { 0, 40, 41, plan.Segments.Count - 1 })
+        foreach (var index in new[] { 0, 40, 41, plan.Segments.Count - 1 }.Concat(args[6..].Select(int.Parse)).Distinct())
         {
             var s = plan.Segments[index]; var offset = VirtualMatroska.HeaderBytes + s.SlotOffset;
             var a = await Call("GET", route, query, $"bytes={offset}-{offset + 63}"); var b = await Call("GET", route, query, $"bytes={offset + 8}-{offset + 31}");
