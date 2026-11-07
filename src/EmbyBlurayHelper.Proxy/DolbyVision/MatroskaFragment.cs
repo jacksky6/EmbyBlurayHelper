@@ -9,6 +9,32 @@ internal sealed class MatroskaFragment
     internal sealed record Packet(int Track, long TimeMs, bool Key, byte Flags, ReadOnlyMemory<byte> Data, long? Duration = null);
     internal List<Track> Tracks { get; } = [];
     internal List<Packet> Packets { get; } = [];
+    internal void FillMissingLanguages(IReadOnlyList<DvDiscPlan.TrackLanguage> source)
+    {
+        static string Codec(string codec) => codec switch
+        {
+            "truehd" => "A_TRUEHD", "ac3" => "A_AC3", "eac3" => "A_EAC3", "dts" => "A_DTS", "flac" => "A_FLAC",
+            "pgssub" or "hdmv_pgs_subtitle" => "S_HDMV/PGS", "subrip" or "srt" => "S_TEXT/UTF8", _ => ""
+        };
+        foreach (var type in new[] { 2, 17 })
+        {
+            var actual = Tracks.Where(t => t.Type == type).ToArray(); var expected = source.Where(t => t.Type == type).ToArray();
+            // Emby's original ffprobe and the remuxer's explicit -map preserve
+            // stream order. Require the complete codec sequence too; never
+            // assign a language by an unverified index or track count alone.
+            if (actual.Length != expected.Length || actual.Where((t, i) => t.Codec != Codec(expected[i].Codec)).Any()) continue;
+            for (var i = 0; i < actual.Length; i++)
+            {
+                var language = expected[i].Language;
+                if (language.Length != 3 || !language.All(char.IsAsciiLetter) || language == "und") continue;
+                var fields = Ebml.Read(actual[i].Definition).ToArray();
+                var current = fields.FirstOrDefault(f => f.Id == 0x22b59c);
+                if (!current.Data.IsEmpty && Encoding.ASCII.GetString(current.Data.Span) != "und") continue;
+                var definition = Ebml.Join(fields.Where(f => f.Id != 0x22b59c).Select(f => Ebml.Bytes(f.Id, f.Data.ToArray())).Append(Ebml.Text(0x22b59c, language)));
+                Tracks[Tracks.IndexOf(actual[i])] = actual[i] with { Definition = definition };
+            }
+        }
+    }
     internal static string ParseTracksSignature(byte[] tracks) => string.Join('|', Ebml.Read(Ebml.Read(tracks).Single().Data).Where(t => t.Id == 0xae).Select(t =>
         string.Join(',', Ebml.Read(t.Data).Where(e => e.Id is 0xd7 or 0x83 or 0x86 or 0x63a2 or 0xe0 or 0xe1).Select(e => e.Id.ToString("x") + ":" + System.Convert.ToHexString(e.Data.Span)))));
     internal static MatroskaFragment Parse(ReadOnlyMemory<byte> bytes)
@@ -59,7 +85,7 @@ internal sealed class MatroskaFragment
                 block[(offset + 3)..], duration));
         }
     }
-    internal (byte[] Tracks, List<Packet> Packets, int Video, int Rpus) Convert(DoviNative dovi, byte level = 6)
+    internal (byte[] Tracks, List<Packet> Packets, int Video, int Rpus) Convert(DoviNative dovi, byte level = 6, Memory<byte> workspace = default)
     {
         var videos = Tracks.Where(t => t.Type == 1).OrderByDescending(t => t.Width).ToArray();
         if (videos.Length is < 1 or > 2 || videos.Any(t => t.Codec != "V_MPEGH/ISO/HEVC") || videos[0].Width < 3840)
@@ -75,7 +101,7 @@ internal sealed class MatroskaFragment
                         if (!rpus.TryGetValue(packet.TimeMs, out var queue)) rpus[packet.TimeMs] = queue = new();
                         queue.Enqueue(nal);
                     }
-        var converted = new List<Packet>(); var count = 0;
+        var converted = new List<Packet>(); var count = 0; var workspacePosition = 0;
         foreach (var packet in Packets)
         {
             if (el is not null && packet.Track == el.Number) continue;
@@ -96,8 +122,11 @@ internal sealed class MatroskaFragment
                 rpu = queue.Dequeue();
             }
             copyNals.Add(dovi.ToP81(rpu.Span)); count++;
-            var output = new byte[copyNals.Sum(n => n.Length + 4)]; var position = 0;
-            foreach (var nal in copyNals) { BinaryPrimitives.WriteInt32BigEndian(output.AsSpan(position), nal.Length); nal.CopyTo(output.AsMemory(position + 4)); position += nal.Length + 4; }
+            var length = copyNals.Sum(n => n.Length + 4);
+            if (!workspace.IsEmpty && length > workspace.Length - workspacePosition) throw new InvalidDataException("DV pictures exceed the bounded conversion workspace.");
+            var output = workspace.IsEmpty ? new byte[length].AsMemory() : workspace.Slice(workspacePosition, length);
+            workspacePosition += length; var position = 0;
+            foreach (var nal in copyNals) { BinaryPrimitives.WriteInt32BigEndian(output.Span[position..], nal.Length); nal.CopyTo(output[(position + 4)..]); position += nal.Length + 4; }
             converted.Add(packet with { Data = output });
         }
         if (count == 0) throw new InvalidDataException("No Profile 7 pictures in fragment.");

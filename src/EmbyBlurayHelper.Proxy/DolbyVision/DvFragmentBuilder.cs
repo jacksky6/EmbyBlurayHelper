@@ -10,11 +10,24 @@ internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<Ma
     // A global admission gate bounds native processes and transformation scratch
     // memory independently of the configurable media cache.
     private static readonly SemaphoreSlim Worker = new(1, 1);
+    // Reuse the two large workspaces. Repeated MemoryStream growth and one
+    // large allocation per picture otherwise leave GiB of collectible buffers
+    // in the runtime even though the media cache is correctly bounded.
+    private byte[]? remuxScratch;
+    private byte[]? pictureScratch;
+    private long lastActivity = DateTime.UtcNow.Ticks;
+    internal void Trim()
+    {
+        if (DateTime.UtcNow.Ticks - Interlocked.Read(ref lastActivity) < TimeSpan.FromMinutes(2).Ticks || !Worker.Wait(0)) return;
+        try { remuxScratch = null; pictureScratch = null; }
+        finally { Worker.Release(); }
+    }
     internal async Task<DvFragment> Build(DvDiscPlan plan, DvDiscPlan.Segment segment, CancellationToken token)
     {
         await Worker.WaitAsync(token);
         try
         {
+            Interlocked.Exchange(ref lastActivity, DateTime.UtcNow.Ticks);
             var clock = Stopwatch.StartNew(); using var input = plan.Open(segment);
             await using var source = new IsoMediaHttpSource(input.Slice, token, readBudget: 256L * 1024 * 1024);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromSeconds(60));
@@ -28,7 +41,8 @@ internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<Ma
             ReadOnlyMemory<byte> bytes;
             try
             {
-                bytes = await ReadBounded(process.StandardOutput.BaseStream, 192 * 1024 * 1024, timeout.Token);
+                var scratch = remuxScratch ??= GC.AllocateUninitializedArray<byte>(192 * 1024 * 1024);
+                bytes = await ReadInto(process.StandardOutput.BaseStream, scratch, timeout.Token);
                 await process.WaitForExitAsync(timeout.Token); var stderr = await errors;
                 var message = System.Text.Encoding.UTF8.GetString(stderr.Span);
                 if (process.ExitCode != 0) throw new IOException("DV fragment remux failed (exit " + process.ExitCode + "). " + message[..Math.Min(message.Length, 1200)]);
@@ -41,14 +55,29 @@ internal sealed class DvFragmentBuilder(string ffmpeg, string libdovi, Action<Ma
                 token.ThrowIfCancellationRequested(); throw;
             }
             var fragment = MatroskaFragment.Parse(bytes);
+            fragment.FillMissingLanguages(plan.SourceLanguages);
             Select(fragment, input.StartMs, input.EndMs, segment.End == segment.Clip.Index.Bytes);
-            using var converter = new DoviNative(libdovi); var result = fragment.Convert(converter, plan.Level);
+            using var converter = new DoviNative(libdovi);
+            var pictures = pictureScratch ??= GC.AllocateUninitializedArray<byte>(128 * 1024 * 1024);
+            var result = fragment.Convert(converter, plan.Level, pictures);
             verify?.Invoke(fragment, result.Packets);
             var cluster = MatroskaFragment.Cluster(result.Packets, segment.Clip.InMs - segment.Clip.TimelineMs);
             if (cluster.Length + 9 > segment.SlotBytes) throw new InvalidDataException("Converted GOP exceeds its reserved virtual slot.");
             return new(cluster, result.Tracks, result.Video, result.Rpus, source.BytesRead, clock.ElapsedMilliseconds);
         }
-        finally { Worker.Release(); }
+        finally { Interlocked.Exchange(ref lastActivity, DateTime.UtcNow.Ticks); Worker.Release(); }
+    }
+    private static async Task<ReadOnlyMemory<byte>> ReadInto(Stream stream, byte[] buffer, CancellationToken token)
+    {
+        var length = 0;
+        while (length < buffer.Length)
+        {
+            var count = await stream.ReadAsync(buffer.AsMemory(length, Math.Min(65536, buffer.Length - length)), token);
+            if (count == 0) return buffer.AsMemory(0, length);
+            length += count;
+        }
+        if (await stream.ReadAsync(new byte[1], token) != 0) throw new IOException("DV remuxer exceeded the fragment memory budget.");
+        return buffer;
     }
     private static void Select(MatroskaFragment fragment, long start, long end, bool last)
     {

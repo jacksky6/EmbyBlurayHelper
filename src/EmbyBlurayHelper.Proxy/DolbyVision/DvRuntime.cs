@@ -51,7 +51,7 @@ internal sealed class DvRuntime : IDisposable
         }
         engineStamp = string.Join('|', new[] { options.Ffmpeg, options.Library }.Select(p => { var f = new FileInfo(p.Length == 0 ? "." : p); return f.Exists ? f.FullName + ":" + f.Length + ":" + f.LastWriteTimeUtc.Ticks : p; }));
         Cache = new(options.SessionMiB * 1048576L, options.GlobalMiB * 1048576L);
-        cleanup = new Timer(_ => { Cache.Trim(); TrimPlans(); }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        cleanup = new Timer(_ => { Cache.Trim(); TrimPlans(); builder.Trim(); }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
     internal async Task<Presentation> Describe(JsonElement source, CancellationToken token)
     {

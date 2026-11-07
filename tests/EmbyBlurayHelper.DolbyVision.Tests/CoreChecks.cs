@@ -5,6 +5,23 @@ internal static class CoreChecks
 {
     internal static async Task Run(Action<bool, string> check)
     {
+        MatroskaFragment AudioTracks(string firstLanguage = "und")
+        {
+            var fragment = new MatroskaFragment();
+            fragment.Tracks.Add(new(3, 2, "A_TRUEHD", Ebml.Text(0x22b59c, firstLanguage), [], 0));
+            fragment.Tracks.Add(new(4, 2, "A_AC3", Ebml.Text(0x22b59c, "und"), [], 0));
+            return fragment;
+        }
+        string Language(MatroskaFragment.Track track) => System.Text.Encoding.ASCII.GetString(Ebml.Read(track.Definition).Single(e => e.Id == 0x22b59c).Data.Span);
+        var audio = AudioTracks();
+        audio.FillMissingLanguages([new(2, "truehd", "eng"), new(2, "ac3", "zho")]);
+        check(Language(audio.Tracks[0]) == "eng" && Language(audio.Tracks[1]) == "zho", "known source language fills the TrueHD compatibility AC3 track");
+        audio = AudioTracks("fra"); audio.FillMissingLanguages([new(2, "truehd", "eng"), new(2, "ac3", "zho")]);
+        check(Language(audio.Tracks[0]) == "fra", "existing native language takes precedence over saved metadata");
+        audio = AudioTracks(); audio.FillMissingLanguages([new(2, "ac3", "eng"), new(2, "truehd", "zho")]);
+        check(audio.Tracks.All(t => Language(t) == "und"), "different codec order cannot misassign source languages");
+        audio = AudioTracks(); audio.FillMissingLanguages([new(2, "truehd", "und"), new(2, "ac3", "unknown")]);
+        check(audio.Tracks.All(t => Language(t) == "und"), "unknown source language stays unknown");
         var context = new DefaultHttpContext();
         foreach (var (input, start, end, ok) in new[] { ("bytes=0-99", 0L, 99L, true), ("bytes=900-", 900L, 999L, true), ("bytes=-12", 988L, 999L, true),
             ("bytes=999-1001", 999L, 999L, true), ("bytes=1000-", 0L, 0L, false), ("bytes=-0", 0L, 0L, false), ("bytes=0-2,5-9", 0L, 0L, false), ("wat", 0L, 0L, false) })

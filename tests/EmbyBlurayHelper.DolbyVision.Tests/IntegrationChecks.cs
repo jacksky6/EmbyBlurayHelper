@@ -81,7 +81,9 @@ internal static class IntegrationChecks
                 return hash.GetHashAndReset();
             }
             check(Pictures(input.Packets, bl.Number).SequenceEqual(Pictures(output, bl.Number)), "actual disc compressed BL picture hash unchanged");
-            packets[packets.Count] = output.ToArray();
+            // Production reuses scratch after the fragment is copied to its
+            // cached cluster. This independent reference outlives that build.
+            packets[packets.Count] = output.Select(p => p with { Data = p.Data.ToArray() }).ToArray();
         });
         var s0 = plan.Segments[40]; var s1 = plan.Segments[41];
         var f0 = await builder.Build(plan, s0, CancellationToken.None); var f1 = await builder.Build(plan, s1, CancellationToken.None);

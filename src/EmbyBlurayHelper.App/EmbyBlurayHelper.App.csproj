@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <AssemblyName>EmbyBlurayHelper</AssemblyName>
     <Version>0.2.0</Version>
+    <!-- Home/NAS workloads share one conversion worker; avoid one server GC
+         heap per CPU retaining several GiB of short-lived media buffers. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
     <InvariantGlobalization>true</InvariantGlobalization>
     <PredefinedCulturesOnly>false</PredefinedCulturesOnly>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>

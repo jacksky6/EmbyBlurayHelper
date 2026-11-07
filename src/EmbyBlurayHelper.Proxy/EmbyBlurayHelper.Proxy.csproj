@@ -6,6 +6,7 @@
     <AssemblyName>EmbyBlurayHelper.Proxy</AssemblyName>
     <RootNamespace>EmbyBlurayHelper.Proxy</RootNamespace>
     <Version>0.1.0</Version>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BDInfo" Version="0.8.0" />

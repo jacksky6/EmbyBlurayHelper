@@ -85,6 +85,16 @@ Infuse 元数据，不接管原播放。此功能不要求升级 Emby 插件 DLL
 限制同时只有一段进行 FFmpeg / libdovi 转换，避免工作区随请求并发增加。
 单个输入窗口至多 192 MiB；单个输出片段槽至多 128 MiB。
 
+FFmpeg 输出和转换后压缩画面使用两个可复用工作缓冲，容量分别最多
+192 MiB、128 MiB；全局一次只构建一个片段，避免不断扩容及逐帧大数组
+产生大量待回收对象。工作区闲置约两分钟后解除引用；实际归还物理内存的
+时机由 .NET 和操作系统决定。Helper / 独立代理采用 workstation GC，
+避免家用低并发负载下按 CPU 建立多份 server GC 堆。
+
+本机同类请求的抽样观测中，优化前 Helper 工作集约 2.2 GiB，复用工作区
+后约 1.1 GiB；后者片段缓存约 382 MiB。该数值仅包括 Helper，未计
+FFmpeg 子进程及 OS 文件缓存，不是保证上限，也不能直接外推到 DSM。
+
 ## 验证与仍需设备验证的内容
 
 前置实验 `docs/INFUSE-DV-P81-EXPERIMENT.md` 已由用户在 Apple TV / Infuse
@@ -103,7 +113,7 @@ Infuse 元数据，不接管原播放。此功能不要求升级 Emby 插件 DLL
 - ffprobe 读出真实 DOVI config：Profile 8、BL compatibility 1、RPU=1、
   EL=0、BL=1；不是只改详情页的标签。
 - 缓存并发、取消、预算、重试、Range、鉴权、开关关闭与客户端隔离：
-  本机综合核验共 120 项；新页面 13 项；应用集成 138 项通过。
+  本机综合核验共 124 项；新页面 13 项；应用集成 138 项通过。
 - 原有 transport / playlist 169 项、library 86 项、scope 35 项、
   media features 42 项、chapters 31 项及 UDF / 虚拟 ISO 检查通过。
 - 抽测约 4.4 秒段的本机完整读取 / 封装 / RPU 转换约 0.7–1 秒。
@@ -119,5 +129,39 @@ node tests/web/dolby-vision.test.cjs
 
 当前安全范围是未加密、单角度、单时钟域、完整 play item；支持按完整
 片段组织的 BDMV 与 UDF ISO 读取路径。裁剪 / 复杂分支保留原路径。
-真实 P7 ISO、多片段 DV、MEL、24/25/30/50/60 fps 的设备覆盖尚待补齐；
+真实 P7 ISO 的服务端读取已补测；多片段 DV、MEL、24/25/30/50/60 fps 的设备覆盖尚待补齐；
 不将单片 BDMV 测试扩大为所有原盘均已兼容的结论。
+
+### 本机已运行的 HTTP 链路
+
+2026-11-07 已更新主测试实例，Emby 仍为 8096，管理界面 8099、Infuse
+代理 8097。没有更换 Emby 插件 DLL，也没有重启 Emby。源码第一个
+实现检查点为 `de29f75`；内存和 ISO 兼容音轨语言修复在其后独立提交。
+本机为配合 Apple TV 测试已打开新开关；全新安装仍默认关闭。
+
+经过运行中的 Kestrel、真实 HTTP 认证、Range 及 FFmpeg/ffprobe 验证：
+
+- BDMV《少数派报告》ID 12：真实 Profile 8 / compatibility 1，1 条视频、
+  19 条音轨/字幕及语言、8710.243 秒时长、24 个章节。首段、180 秒、
+  3600 秒、片尾能按索引读取；30 秒按播放速度连续复制封装跨段通过。
+- ISO《禁闭岛》ID 1886：首段、180 秒、3600 秒、8274 秒的实际 UDF
+  读取与 P8.1 校验、30 秒连续读取通过，时长 8284.776 秒、20 个章节，
+  8 条音轨/字幕的已知语言均保留。TrueHD 配套
+  AC-3 轨道在原封装器遗漏语言时，只在轨道类型、数量、编码完整序列
+  均匹配 Emby 保存信息的前提下补齐；保留已有原生语言，不修改音频包。
+- 非 Infuse 的元数据不变；缓存命中仍验证调用者权限；播放读取退出后
+  `processing=0`。真实浏览器检查了登录、依赖检查、保存、开关关闭/
+  打开及刷新后状态持久化，并检查桌面与手机宽度布局。
+
+HTTP 报告仅写入被 Git 忽略的 `artifacts/checks/dv-streaming/`，不含
+API key。复现真实 HTTP 测试（会临时开启功能，结束恢复开关）：
+
+```powershell
+node tests/check-local-dolby-vision.cjs --continuous
+node tests/check-local-dolby-vision.cjs --item 1886 --continuous
+```
+
+如明确需要测试后保持开启，加 `--leave-enabled`；失败仍恢复原状态。
+实际 Apple TV 应继续连接 `192.168.1.10:8097`，强制退出 Infuse 后重新
+打开并同步媒体库，分别播放上述原影片，核对电视 DV 输出、声音、字幕、
+连续播放、前后拖动与续播。服务端 HTTP 验证不代替这些设备验证。

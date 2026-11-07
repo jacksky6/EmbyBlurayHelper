@@ -20,6 +20,8 @@ internal sealed class DvDiscPlan
     internal List<Segment> Segments { get; } = [];
     internal long Length => VirtualMatroska.HeaderBytes + Segments.Sum(s => (long)s.SlotBytes);
     internal Dictionary<int, string> Languages { get; } = [];
+    internal sealed record TrackLanguage(int Type, string Codec, string Language);
+    internal List<TrackLanguage> SourceLanguages { get; } = [];
     internal long[] Chapters { get; private init; } = [];
     private (string Path, long Length, long Stamp)[] stamps = [];
     internal bool IsCurrent => stamps.All(s => { var file = new FileInfo(s.Path); return file.Exists && file.Length == s.Length && file.LastWriteTimeUtc.Ticks == s.Stamp; });
@@ -53,6 +55,15 @@ internal sealed class DvDiscPlan
             Chapters = source.TryGetProperty("Chapters", out var chapters) ? chapters.EnumerateArray().Where(c => !c.TryGetProperty("MarkerType", out var marker) || marker.GetString() is null or "Chapter")
                 .Select(c => c.GetProperty("StartPositionTicks").GetInt64() / 10000).Where(t => t >= 0 && t < playlist.TotalLength * 1000).Distinct().Order().ToArray() : [] };
         var stampFiles = new List<string>();
+        foreach (var stream in source.GetProperty("MediaStreams").EnumerateArray().Where(s => !s.TryGetProperty("IsExternal", out var external) || external.ValueKind != JsonValueKind.True)
+            .OrderBy(s => s.TryGetProperty("Index", out var number) ? number.GetInt32() : int.MaxValue))
+        {
+            var type = stream.TryGetProperty("Type", out var kind) ? kind.GetString() : "";
+            if (type is not ("Audio" or "Subtitle")) continue;
+            var language = stream.TryGetProperty("Language", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+            var codec = stream.TryGetProperty("Codec", out var code) && code.ValueKind == JsonValueKind.String ? code.GetString() ?? "" : "";
+            plan.SourceLanguages.Add(new(type == "Audio" ? 2 : 17, codec.ToLowerInvariant(), language.ToLowerInvariant()));
+        }
         if (iso) stampFiles.Add(path); else stampFiles.Add(Directory.EnumerateFiles(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(indexPath)!, "PLAYLIST"))
             .Single(p => System.IO.Path.GetFileName(p).Equals(playlist.Name, StringComparison.OrdinalIgnoreCase)));
         foreach (var stream in playlist.PlaylistStreams.Values.Where(s => s.IsAudioStream || s.IsTextStream || s.IsGraphicsStream))
@@ -91,8 +102,9 @@ internal sealed class DvDiscPlan
         }
         if (plan.Segments.Count is 0 or > 10000) throw new InvalidDataException("Invalid DV segment count.");
         plan.stamps = stampFiles.Distinct().Select(p => { var f = new FileInfo(p); return (f.FullName, f.Length, f.LastWriteTimeUtc.Ticks); }).ToArray();
-        plan.Signature = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("DV-v1\n" + engineStamp + "\n" + path + "\n" + playlist.Name + "\n" + plan.DurationMs + "|" + plan.Level + "\n" +
-            string.Join('\n', plan.stamps.Select(s => s.Path + "|" + s.Length + "|" + s.Stamp)) + "\n" + string.Join(',', plan.Chapters)))).ToLowerInvariant();
+        plan.Signature = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("DV-v2\n" + engineStamp + "\n" + path + "\n" + playlist.Name + "\n" + plan.DurationMs + "|" + plan.Level + "\n" +
+            string.Join('\n', plan.stamps.Select(s => s.Path + "|" + s.Length + "|" + s.Stamp)) + "\n" + string.Join(',', plan.Chapters) + "\n" +
+            string.Join('\n', plan.SourceLanguages.Select(s => s.Type + "|" + s.Codec + "|" + s.Language))))).ToLowerInvariant();
         return plan;
     }
     internal DvInput Open(Segment segment) => new(this, segment);
